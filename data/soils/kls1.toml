@@ -1,18 +1,13 @@
-# KLS-1 - Korean Lunar Soil Simulant
-# Pressure-sinkage parameters: Bekker, Reece and dimensional-analysis models.
+# SPDX-License-Identifier: Apache-2.0
 #
-# Source   Lim Y, Le VD, Bahati PA (2021)
-#          Development of a New Pressure-Sinkage Model for Rover Wheel-Lunar
-#          Soil Interaction based on Dimensional Analysis and Bevameter Tests
-#          J. Astron. Space Sci. 38(4), 237-250
-#          doi:10.5140/JASS.2021.38.4.237
-#          CC-BY-NC-3.0. Tables 3 and 5. Accessed 2026-08-03.
+# KLS-1 (Korean Lunar Soil Simulant) — pressure-sinkage parameters.
 #
-# Policy   Transcribed as published. No unit conversion, no sign correction,
-#          no inference. Unreported quantities are listed as nan.
+# Transcribed as published: no unit conversion, no sign correction, no
+# inference. Unreported quantities are nan. The negative cohesive_modulus is a
+# fitting coefficient, not a material property, and must not be "corrected".
 
 schema_version = 1
-id = "kls1"
+id             = "kls1"
 
 [material]
 name         = "Korean Lunar Soil Simulant"
@@ -22,9 +17,19 @@ analogue_for = "lunar_regolith"
 fidelity     = "non_mineralogical"
 producer     = "Korea Institute of Civil Engineering and Building Technology"
 
+
 [[dataset]]
 id       = "lim2021"
+title    = "Development of a New Pressure-Sinkage Model for Rover Wheel-Lunar Soil Interaction based on Dimensional Analysis and Bevameter Tests"
+authors  = ["Lim Y", "Le VD", "Bahati PA"]
+year     = 2021
+journal  = "Journal of Astronomy and Space Sciences"
+volume   = 38
+issue    = 4
+pages    = "237-250"
 doi      = "10.5140/JASS.2021.38.4.237"
+license  = "CC-BY-NC-3.0"
+tables   = ["Table 3", "Table 5"]
 accessed = 2026-08-03
 
 [dataset.conditions]
@@ -48,9 +53,9 @@ plate_geometry     = "circular_rigid_flat"
 plate_length_scale = "radius"
 
 plates = [
-  { diameter_m = 0.060, b_m = 0.0300, area_m2 = 2.827433e-3 },
-  { diameter_m = 0.070, b_m = 0.0350, area_m2 = 3.848451e-3 },
-  { diameter_m = 0.075, b_m = 0.0375, area_m2 = 4.417865e-3 },
+  { diameter_m = 0.060, contact_half_width_m = 0.0300, area_m2 = 2.827433e-3 },
+  { diameter_m = 0.070, contact_half_width_m = 0.0350, area_m2 = 3.848451e-3 },
+  { diameter_m = 0.075, contact_half_width_m = 0.0375, area_m2 = 4.417865e-3 },
 ]
 
 
@@ -58,33 +63,34 @@ plates = [
 
 [[dataset.model]]
 id         = "bekker"
+status     = "verified"
 fit_method = "weighted_least_squares_wong1980"
 
 [dataset.model.parameters]
-n     = { value =    1.2594, units = "1",          sigma = nan }
-k_c   = { value =  -44.0554, units = "kN/m^(n+1)", sigma = nan }
-k_phi = { value = 3581.8106, units = "kN/m^(n+2)", sigma = nan }
+sinkage_exponent   = { value =    1.2594, units = "1",          sigma = nan }
+cohesive_modulus   = { value =  -44.0554, units = "kN/m^(n+1)", sigma = nan }
+frictional_modulus = { value = 3581.8106, units = "kN/m^(n+2)", sigma = nan }
 
 [dataset.model.quality]
 metric = "goodness_of_fit_wong2001"
 units  = "percent"
 by_plate = [
-  { b_m = 0.0300, value = 93.13 },
-  { b_m = 0.0350, value = 87.11 },
-  { b_m = 0.0375, value = 90.89 },
+  { contact_half_width_m = 0.0300, value = 93.13 },
+  { contact_half_width_m = 0.0350, value = 87.11 },
+  { contact_half_width_m = 0.0375, value = 90.89 },
 ]
 
 [dataset.model.validity]
-b           = { min = 0.0300, max = 0.0375, units = "m" }
-sinkage     = { min = 0.0,    max = 0.095,  units = "m" }
-bed_density = { min = 1602,   max = 1602,   units = "kg/m^3" }
-gravity     = { min = 9.81,   max = 9.81,   units = "m/s^2" }
+contact_half_width = { min = 0.0300, max = 0.0375, units = "m" }
+sinkage            = { min = 0.0,    max = 0.095,  units = "m" }
+bed_density        = { min = 1602,   max = 1602,   units = "kg/m^3" }
+gravity            = { min = 9.81,   max = 9.81,   units = "m/s^2" }
 
 [dataset.model.verification]
 cases = [
-  { b_m = 0.0300, z_m = 0.05, p_kPa = 48.57842328801839, rel_tol = 1e-9 },
-  { b_m = 0.0350, z_m = 0.05, p_kPa = 53.40081714591394, rel_tol = 1e-9 },
-  { b_m = 0.0375, z_m = 0.05, p_kPa = 55.32977468907216, rel_tol = 1e-9 },
+  { contact_half_width_m = 0.0300, sinkage_m = 0.05, pressure_kPa = 48.57842328801839, rel_tol = 1e-9 },
+  { contact_half_width_m = 0.0350, sinkage_m = 0.05, pressure_kPa = 53.40081714591394, rel_tol = 1e-9 },
+  { contact_half_width_m = 0.0375, sinkage_m = 0.05, pressure_kPa = 55.32977468907216, rel_tol = 1e-9 },
 ]
 
 
@@ -92,51 +98,68 @@ cases = [
 
 [[dataset.model]]
 id         = "reece"
+status     = "verified"
 fit_method = "weighted_least_squares_wong1980"
 
 [dataset.model.parameters]
-n        = { value =    1.2594, units = "1",      sigma = nan }
-k_c_dd   = { value =  -29.0317, units = "kN/m^2", sigma = nan }
-k_phi_dd = { value = 1807.4675, units = "kN/m^3", sigma = nan }
+sinkage_exponent   = { value =    1.2594, units = "1",      sigma = nan }
+cohesive_modulus   = { value =  -29.0317, units = "kN/m^2", sigma = nan }
+frictional_modulus = { value = 1807.4675, units = "kN/m^3", sigma = nan }
 
 [dataset.model.quality]
 metric = "goodness_of_fit_wong2001"
 units  = "percent"
 by_plate = [
-  { b_m = 0.0300, value = 92.31 },
-  { b_m = 0.0350, value = 86.64 },
-  { b_m = 0.0375, value = 91.44 },
+  { contact_half_width_m = 0.0300, value = 92.31 },
+  { contact_half_width_m = 0.0350, value = 86.64 },
+  { contact_half_width_m = 0.0375, value = 91.44 },
 ]
 
 [dataset.model.validity]
-b           = { min = 0.0300, max = 0.0375, units = "m" }
-sinkage     = { min = 0.0,    max = 0.095,  units = "m" }
-bed_density = { min = 1602,   max = 1602,   units = "kg/m^3" }
-gravity     = { min = 9.81,   max = 9.81,   units = "m/s^2" }
+contact_half_width = { min = 0.0300, max = 0.0375, units = "m" }
+sinkage            = { min = 0.0,    max = 0.095,  units = "m" }
+bed_density        = { min = 1602,   max = 1602,   units = "kg/m^3" }
+gravity            = { min = 9.81,   max = 9.81,   units = "m/s^2" }
+
+[dataset.model.verification]
+cases = [
+  { contact_half_width_m = 0.0300, sinkage_m = 0.05, pressure_kPa = 47.936306183193146, rel_tol = 1e-9 },
+  { contact_half_width_m = 0.0350, sinkage_m = 0.05, pressure_kPa = 53.639675945878494, rel_tol = 1e-9 },
+  { contact_half_width_m = 0.0375, sinkage_m = 0.05, pressure_kPa = 55.667388593034400, rel_tol = 1e-9 },
+]
 
 
 # --- Lim et al. (2021)
+#
+# Transcribed, not implemented. The published plate scaling
+# plate_scaling_slope * b + plate_scaling_intercept is negative across the
+# whole tested range of half-widths, crossing zero at b = 0.0754 m, so these
+# parameters do not reproduce sensible pressures under the stated equations.
+# That crossing sits within 0.05 percent of the largest plate diameter,
+# 0.075 m; whether the model was fitted against diameter rather than radius is
+# a question for the paper, not an assumption to encode. Do not guess at a fix.
 
 [[dataset.model]]
 id         = "dimensional_analysis_lim2021"
+status     = "not_reproducible"
 fit_method = "unweighted_least_squares"
 
 [dataset.model.parameters]
-inv_n = { value =    1.261543, units = "1",   sigma = nan }
-alpha = { value =  2320.5507,  units = "1/m", sigma = nan }
-beta  = { value =  -174.9706,  units = "1",   sigma = nan }
+inverse_sinkage_exponent = { value =    1.261543, units = "1",   sigma = nan }
+plate_scaling_slope      = { value = 2320.5507,   units = "1/m", sigma = nan }
+plate_scaling_intercept  = { value = -174.9706,   units = "1",   sigma = nan }
 
 [dataset.model.quality]
 metric = "goodness_of_fit_wong2001"
 units  = "percent"
 by_plate = [
-  { b_m = 0.0300, value = 93.23 },
-  { b_m = 0.0350, value = 88.37 },
-  { b_m = 0.0375, value = 90.80 },
+  { contact_half_width_m = 0.0300, value = 93.23 },
+  { contact_half_width_m = 0.0350, value = 88.37 },
+  { contact_half_width_m = 0.0375, value = 90.80 },
 ]
 
 [dataset.model.validity]
-b           = { min = 0.0300, max = 0.0375, units = "m" }
-sinkage     = { min = 0.0,    max = 0.095,  units = "m" }
-bed_density = { min = 1602,   max = 1602,   units = "kg/m^3" }
-gravity     = { min = 9.81,   max = 9.81,   units = "m/s^2" }
+contact_half_width = { min = 0.0300, max = 0.0375, units = "m" }
+sinkage            = { min = 0.0,    max = 0.095,  units = "m" }
+bed_density        = { min = 1602,   max = 1602,   units = "kg/m^3" }
+gravity            = { min = 9.81,   max = 9.81,   units = "m/s^2" }
