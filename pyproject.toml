@@ -1,0 +1,52 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Packaging and tool configuration.
+#
+# The package root is python/, not src/. Runtime dependencies are declared for
+# anyone installing outside pixi; inside pixi they are already satisfied by the
+# conda packages in pixi.toml, so bounds stay loose enough that pip will not
+# pull duplicate wheels over them.
+#
+# requires-python has no upper bound, unlike pixi.toml. Nothing in this package
+# breaks on a newer interpreter; the 3.12 ceiling is an environment constraint
+# imposed by Chrono and Pinocchio conda builds, and belongs where the
+# environment is defined.
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name            = "biome"
+version         = "0.1.0"
+description     = "Simulation and autonomy stack for legged robots on deformable terrain"
+requires-python = ">=3.12"
+license         = "Apache-2.0"
+authors         = [{ name = "b1aha", email = "jiriblahaa@outlook.cz" }]
+dependencies    = ["numpy>=2.0"]
+
+[project.urls]
+Repository = "https://github.com/biome-robotics/biome"
+
+[tool.hatch.build.targets.wheel]
+packages = ["python/biome"]
+
+[tool.hatch.build.targets.sdist]
+include = ["python/biome", "pyproject.toml"]
+
+[tool.mypy]
+python_version         = "3.12"
+mypy_path              = "python"
+files                  = ["python/biome"]
+strict                 = true
+warn_unreachable       = true
+local_partial_types    = true
+enable_error_code = [
+  "ignore-without-code",
+  "possibly-undefined",
+  "redundant-expr",
+  "redundant-self",
+  "truthy-bool",
+  "truthy-iterable",
+  "unimported-reveal",
+]
