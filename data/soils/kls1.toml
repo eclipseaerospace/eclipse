@@ -1,0 +1,142 @@
+# KLS-1 - Korean Lunar Soil Simulant
+# Pressure-sinkage parameters: Bekker, Reece and dimensional-analysis models.
+#
+# Source   Lim Y, Le VD, Bahati PA (2021)
+#          Development of a New Pressure-Sinkage Model for Rover Wheel-Lunar
+#          Soil Interaction based on Dimensional Analysis and Bevameter Tests
+#          J. Astron. Space Sci. 38(4), 237-250
+#          doi:10.5140/JASS.2021.38.4.237
+#          CC-BY-NC-3.0. Tables 3 and 5. Accessed 2026-08-03.
+#
+# Policy   Transcribed as published. No unit conversion, no sign correction,
+#          no inference. Unreported quantities are listed as nan.
+
+schema_version = 1
+id = "kls1"
+
+[material]
+name         = "Korean Lunar Soil Simulant"
+short_name   = "KLS-1"
+kind         = "simulant"
+analogue_for = "lunar_regolith"
+fidelity     = "non_mineralogical"
+producer     = "Korea Institute of Civil Engineering and Building Technology"
+
+[[dataset]]
+id       = "lim2021"
+doi      = "10.5140/JASS.2021.38.4.237"
+accessed = 2026-08-03
+
+[dataset.conditions]
+gravity              = { value = 9.81, units = "m/s^2" }
+atmosphere           = "ambient"
+temperature          = "ambient"
+bed_density          = { value = 1602, units = "kg/m^3" }
+bed_relative_density = nan
+bed_preparation      = "hopper_deposition_tamped"
+
+[dataset.apparatus]
+method             = "bevameter_plate_sinkage"
+control_mode       = "displacement"
+penetration_rate   = { value = 13.7,   units = "mm/s" }
+max_normal_load    = { value = 889.64, units = "N" }
+max_sinkage        = { value = 95,     units = "mm" }
+n_tests            = 15
+bin_diameter       = { value = 0.24,   units = "m" }
+bin_depth          = { value = 0.32,   units = "m" }
+plate_geometry     = "circular_rigid_flat"
+plate_length_scale = "radius"
+
+plates = [
+  { diameter_m = 0.060, b_m = 0.0300, area_m2 = 2.827433e-3 },
+  { diameter_m = 0.070, b_m = 0.0350, area_m2 = 3.848451e-3 },
+  { diameter_m = 0.075, b_m = 0.0375, area_m2 = 4.417865e-3 },
+]
+
+
+# --- Bekker (1956)
+
+[[dataset.model]]
+id         = "bekker"
+fit_method = "weighted_least_squares_wong1980"
+
+[dataset.model.parameters]
+n     = { value =    1.2594, units = "1",          sigma = nan }
+k_c   = { value =  -44.0554, units = "kN/m^(n+1)", sigma = nan }
+k_phi = { value = 3581.8106, units = "kN/m^(n+2)", sigma = nan }
+
+[dataset.model.quality]
+metric = "goodness_of_fit_wong2001"
+units  = "percent"
+by_plate = [
+  { b_m = 0.0300, value = 93.13 },
+  { b_m = 0.0350, value = 87.11 },
+  { b_m = 0.0375, value = 90.89 },
+]
+
+[dataset.model.validity]
+b           = { min = 0.0300, max = 0.0375, units = "m" }
+sinkage     = { min = 0.0,    max = 0.095,  units = "m" }
+bed_density = { min = 1602,   max = 1602,   units = "kg/m^3" }
+gravity     = { min = 9.81,   max = 9.81,   units = "m/s^2" }
+
+[dataset.model.verification]
+cases = [
+  { b_m = 0.0300, z_m = 0.05, p_kPa = 48.57842328801839, rel_tol = 1e-9 },
+  { b_m = 0.0350, z_m = 0.05, p_kPa = 53.40081714591394, rel_tol = 1e-9 },
+  { b_m = 0.0375, z_m = 0.05, p_kPa = 55.32977468907216, rel_tol = 1e-9 },
+]
+
+
+# --- Reece (1965)
+
+[[dataset.model]]
+id         = "reece"
+fit_method = "weighted_least_squares_wong1980"
+
+[dataset.model.parameters]
+n        = { value =    1.2594, units = "1",      sigma = nan }
+k_c_dd   = { value =  -29.0317, units = "kN/m^2", sigma = nan }
+k_phi_dd = { value = 1807.4675, units = "kN/m^3", sigma = nan }
+
+[dataset.model.quality]
+metric = "goodness_of_fit_wong2001"
+units  = "percent"
+by_plate = [
+  { b_m = 0.0300, value = 92.31 },
+  { b_m = 0.0350, value = 86.64 },
+  { b_m = 0.0375, value = 91.44 },
+]
+
+[dataset.model.validity]
+b           = { min = 0.0300, max = 0.0375, units = "m" }
+sinkage     = { min = 0.0,    max = 0.095,  units = "m" }
+bed_density = { min = 1602,   max = 1602,   units = "kg/m^3" }
+gravity     = { min = 9.81,   max = 9.81,   units = "m/s^2" }
+
+
+# --- Lim et al. (2021)
+
+[[dataset.model]]
+id         = "dimensional_analysis_lim2021"
+fit_method = "unweighted_least_squares"
+
+[dataset.model.parameters]
+inv_n = { value =    1.261543, units = "1",   sigma = nan }
+alpha = { value =  2320.5507,  units = "1/m", sigma = nan }
+beta  = { value =  -174.9706,  units = "1",   sigma = nan }
+
+[dataset.model.quality]
+metric = "goodness_of_fit_wong2001"
+units  = "percent"
+by_plate = [
+  { b_m = 0.0300, value = 93.23 },
+  { b_m = 0.0350, value = 88.37 },
+  { b_m = 0.0375, value = 90.80 },
+]
+
+[dataset.model.validity]
+b           = { min = 0.0300, max = 0.0375, units = "m" }
+sinkage     = { min = 0.0,    max = 0.095,  units = "m" }
+bed_density = { min = 1602,   max = 1602,   units = "kg/m^3" }
+gravity     = { min = 9.81,   max = 9.81,   units = "m/s^2" }
