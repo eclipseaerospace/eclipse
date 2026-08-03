@@ -23,6 +23,7 @@ from biome.fitting import (
     coefficient_of_determination_by_plate,
     fit_contact_model,
     fit_shared_power_law,
+    relative_deviation,
 )
 from biome.io.soil import CalibratedContactModel
 
@@ -206,3 +207,65 @@ def test_observations_can_be_selected_by_plate(
         assert np.all(selected.contact_half_width_m == half_width)
         total += selected.count
     assert total == bekker_observations.count
+
+
+def test_a_model_does_not_deviate_from_itself(
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+) -> None:
+    bekker = published_models["bekker"]
+    deviation = relative_deviation(
+        bekker.extrapolating,
+        bekker.extrapolating,
+        sinkage=np.linspace(0.01, 0.09, 32),
+        contact_half_width=tested_half_widths[0],
+    )
+    np.testing.assert_allclose(deviation, 0.0, atol=1e-15)
+
+
+def test_deviation_is_independent_of_sinkage_when_the_exponent_is_shared(
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+) -> None:
+    bekker, reece = published_models["bekker"], published_models["reece"]
+    assert (
+        bekker.parameters["sinkage_exponent"] == reece.parameters["sinkage_exponent"]
+    ), "this property only holds while both published fits share one exponent"
+    for half_width in tested_half_widths:
+        deviation = relative_deviation(
+            bekker.extrapolating,
+            reece.extrapolating,
+            sinkage=np.linspace(0.001, 0.095, 64),
+            contact_half_width=float(half_width),
+        )
+        assert deviation.max() - deviation.min() == pytest.approx(0.0, abs=1e-12)
+        assert abs(float(deviation[0])) < 0.05
+
+
+def test_deviation_carries_the_sign_of_the_second_model(
+    published_models: Mapping[str, CalibratedContactModel],
+) -> None:
+    bekker, reece = published_models["bekker"], published_models["reece"]
+    for half_width, expected_sign in ((0.030, -1.0), (0.0375, 1.0)):
+        deviation = float(
+            relative_deviation(
+                bekker.extrapolating,
+                reece.extrapolating,
+                sinkage=0.05,
+                contact_half_width=half_width,
+            )
+        )
+        assert np.sign(deviation) == expected_sign
+
+
+def test_deviation_at_zero_sinkage_is_refused(
+    published_models: Mapping[str, CalibratedContactModel],
+) -> None:
+    bekker, reece = published_models["bekker"], published_models["reece"]
+    with pytest.raises(ValueError, match="undefined where the reference pressure"):
+        relative_deviation(
+            bekker.extrapolating,
+            reece.extrapolating,
+            sinkage=0.0,
+            contact_half_width=0.03,
+        )

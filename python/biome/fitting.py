@@ -36,7 +36,7 @@ from types import MappingProxyType
 from typing import Final, Literal
 
 import numpy as np
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 
 from biome._validation import first_violation
 from biome.terramechanics import CONTACT_MODELS, ContactModel
@@ -51,6 +51,7 @@ __all__ = [
     "coefficient_of_determination_by_plate",
     "fit_contact_model",
     "fit_shared_power_law",
+    "relative_deviation",
 ]
 
 WeightingScheme = Literal["uniform", "pressure_squared"]
@@ -248,6 +249,28 @@ def fit_contact_model(
         observation_count=observations.count,
         plate_count=plate_count,
     )
+
+
+def relative_deviation(
+    reference: ContactModel,
+    other: ContactModel,
+    *,
+    sinkage: ArrayLike,
+    contact_half_width: ArrayLike,
+) -> NDArray[np.float64]:
+    reference_pressure = reference.pressure(
+        sinkage=sinkage, contact_half_width=contact_half_width
+    )
+    if np.any(reference_pressure == 0.0):
+        raise ValueError(
+            "relative deviation is undefined where the reference pressure is "
+            "zero, which is the case at zero sinkage; evaluate at strictly "
+            "positive sinkage"
+        )
+    other_pressure = other.pressure(
+        sinkage=sinkage, contact_half_width=contact_half_width
+    )
+    return np.asarray((other_pressure - reference_pressure) / reference_pressure)
 
 
 def coefficient_of_determination(
