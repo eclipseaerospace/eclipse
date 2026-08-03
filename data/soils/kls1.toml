@@ -88,9 +88,18 @@ gravity            = { min = 9.81,   max = 9.81,   units = "m/s^2" }
 
 [dataset.model.verification]
 cases = [
-  { contact_half_width_m = 0.0300, sinkage_m = 0.05, pressure_kPa = 48.57842328801839, rel_tol = 1e-9 },
-  { contact_half_width_m = 0.0350, sinkage_m = 0.05, pressure_kPa = 53.40081714591394, rel_tol = 1e-9 },
-  { contact_half_width_m = 0.0375, sinkage_m = 0.05, pressure_kPa = 55.32977468907216, rel_tol = 1e-9 },
+  { contact_half_width_m = 0.03, sinkage_m = 0.02375, pressure_kPa = 19.022664428160116, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.03, sinkage_m = 0.0475, pressure_kPa = 45.53952781960555, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.03, sinkage_m = 0.07125000000000001, pressure_kPa = 75.88533486950526, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.03, sinkage_m = 0.095, pressure_kPa = 109.01988004175774, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.035, sinkage_m = 0.02375, pressure_kPa = 20.911049721261907, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.035, sinkage_m = 0.0475, pressure_kPa = 50.060249662442615, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.035, sinkage_m = 0.07125000000000001, pressure_kPa = 83.41849358503954, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.035, sinkage_m = 0.095, pressure_kPa = 119.84231445435327, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.0375, sinkage_m = 0.02375, pressure_kPa = 21.666403838502625, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.0375, sinkage_m = 0.0475, pressure_kPa = 51.86853839957744, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.0375, sinkage_m = 0.07125000000000001, pressure_kPa = 86.43175707125324, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.0375, sinkage_m = 0.095, pressure_kPa = 124.17128821939147, rel_tol = 1e-09 },
 ]
 
 
@@ -123,9 +132,18 @@ gravity            = { min = 9.81,   max = 9.81,   units = "m/s^2" }
 
 [dataset.model.verification]
 cases = [
-  { contact_half_width_m = 0.0300, sinkage_m = 0.05, pressure_kPa = 47.936306183193146, rel_tol = 1e-9 },
-  { contact_half_width_m = 0.0350, sinkage_m = 0.05, pressure_kPa = 53.639675945878494, rel_tol = 1e-9 },
-  { contact_half_width_m = 0.0375, sinkage_m = 0.05, pressure_kPa = 55.667388593034400, rel_tol = 1e-9 },
+  { contact_half_width_m = 0.03, sinkage_m = 0.02375, pressure_kPa = 18.7712199105756, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.03, sinkage_m = 0.0475, pressure_kPa = 44.93757930461853, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.03, sinkage_m = 0.07125000000000001, pressure_kPa = 74.88227078823199, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.03, sinkage_m = 0.095, pressure_kPa = 107.57883842281177, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.035, sinkage_m = 0.02375, pressure_kPa = 21.00458365031718, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.035, sinkage_m = 0.0475, pressure_kPa = 50.28416629517173, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.035, sinkage_m = 0.07125000000000001, pressure_kPa = 83.79161973436658, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.035, sinkage_m = 0.095, pressure_kPa = 120.3783622705753, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.0375, sinkage_m = 0.02375, pressure_kPa = 21.798608952762454, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.0375, sinkage_m = 0.0475, pressure_kPa = 52.18503236399901, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.0375, sinkage_m = 0.07125000000000001, pressure_kPa = 86.95915056047534, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.0375, sinkage_m = 0.095, pressure_kPa = 124.92896261100704, rel_tol = 1e-09 },
 ]
 
 
