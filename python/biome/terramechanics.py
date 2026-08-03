@@ -30,6 +30,8 @@ from typing import Final, Protocol, runtime_checkable
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
+from biome._validation import first_violation
+
 __all__ = [
     "CONTACT_MODELS",
     "BekkerModel",
@@ -60,23 +62,11 @@ class ContactModel(Protocol):
     ) -> NDArray[np.float64]: ...
 
 
-def _first_violation(
-    violations: NDArray[np.bool_], values: NDArray[np.float64]
-) -> tuple[int, int, float]:
-    flat_violations = np.ravel(violations)
-    flat_values = np.ravel(np.broadcast_to(values, violations.shape))
-    return (
-        int(np.count_nonzero(flat_violations)),
-        int(flat_violations.size),
-        float(flat_values[int(np.argmax(flat_violations))]),
-    )
-
-
 def _as_finite_non_negative(values: ArrayLike, quantity: str) -> NDArray[np.float64]:
     array = np.asarray(values, dtype=np.float64)
     violations = np.asarray(~((array >= 0.0) & np.isfinite(array)))
     if violations.any():
-        count, total, first = _first_violation(violations, array)
+        count, total, first = first_violation(violations, array)
         raise ValueError(
             f"{quantity} must be finite and non-negative; {count} of {total} "
             f"values violate this, the first being {first}"
@@ -88,7 +78,7 @@ def _as_finite_positive_half_width(values: ArrayLike) -> NDArray[np.float64]:
     array = np.asarray(values, dtype=np.float64)
     violations = np.asarray(~((array > 0.0) & np.isfinite(array)))
     if violations.any():
-        count, total, first = _first_violation(violations, array)
+        count, total, first = first_violation(violations, array)
         raise ValueError(
             f"contact_half_width must be finite and positive; {count} of "
             f"{total} values violate this, the first being {first}"
@@ -117,7 +107,7 @@ def _require_finite_positive_modulus(
         ~((deformation_modulus > 0.0) & np.isfinite(deformation_modulus))
     )
     if violations.any():
-        count, total, first = _first_violation(violations, contact_half_width)
+        count, total, first = first_violation(violations, contact_half_width)
         raise DegenerateContactModelError(
             "deformation modulus must be finite and positive for pressure to "
             f"increase with sinkage; {count} of {total} contact_half_width "
