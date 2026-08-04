@@ -29,7 +29,7 @@ import hashlib
 import platform
 import sys
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, cast
 
 import matplotlib
 
@@ -40,11 +40,15 @@ import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 
 from biome.fitting import (
+    DEFAULT_WEIGHTING,
     FittedContactModel,
+    WeightingScheme,
     coefficient_of_determination,
     fit_contact_model,
+    mean_relative_residual,
     relative_deviation,
 )
 from biome.io.series import (
@@ -57,7 +61,7 @@ from biome.io.soil import CalibratedContactModel, Dataset, Soil, load_soil
 REPOSITORY_ROOT: Final = Path(__file__).resolve().parents[2]
 DEFAULT_SOIL_PATH: Final = REPOSITORY_ROOT / "data" / "soils" / "kls1.toml"
 DEFAULT_SERIES_PATH: Final = (
-    REPOSITORY_ROOT / "data" / "literature" / "lim2021-figure12.toml"
+    REPOSITORY_ROOT / "data" / "literature" / "lim2021-pressure-sinkage.toml"
 )
 DEFAULT_FIGURE_PATH: Final = (
     Path(__file__).resolve().parent / "figures" / "kls1-pressure-sinkage.png"
@@ -79,11 +83,14 @@ INK_SECONDARY: Final = "#52514e"
 INK_MUTED: Final = "#8a8880"
 SURFACE: Final = "#fcfcfb"
 CURVE_SAMPLES: Final = 400
-LABEL_MINIMUM_GAP_FRACTION: Final = 0.05
+BAND_COLUMN_TOLERANCE_MM: Final = 2.0
+BAND_FILL_ALPHA: Final = 0.12
+PLATE_LEGEND_ANCHOR: Final = 0.755
+WEIGHTINGS: Final[tuple[WeightingScheme, ...]] = ("uniform", "pressure_squared")
 REPORT_SCHEMA_VERSION: Final = 1
 
 FIGURE_STYLE: Final[dict[str, Any]] = {
-    "figure.figsize": (7.2, 5.2),
+    "figure.figsize": (7.8, 5.4),
     "figure.dpi": 200,
     "figure.facecolor": SURFACE,
     "axes.facecolor": SURFACE,
@@ -101,9 +108,9 @@ FIGURE_STYLE: Final[dict[str, Any]] = {
     "legend.frameon": False,
     "legend.fontsize": 8.5,
     "savefig.facecolor": SURFACE,
-    "figure.subplot.top": 0.840,
-    "figure.subplot.bottom": 0.205,
-    "figure.subplot.left": 0.100,
+    "figure.subplot.top": 0.845,
+    "figure.subplot.bottom": 0.215,
+    "figure.subplot.left": 0.085,
     "figure.subplot.right": 0.965,
 }
 
@@ -130,18 +137,61 @@ def _display_path(path: Path) -> str:
         return resolved.as_posix()
 
 
-def _separated(values: list[float], minimum_gap: float) -> list[float]:
-    order = sorted(range(len(values)), key=lambda index: values[index])
-    separated = list(values)
-    for previous, current in zip(order, order[1:], strict=False):
-        if separated[current] - separated[previous] < minimum_gap:
-            separated[current] = separated[previous] + minimum_gap
-    return separated
-
-
 def _sinkage_sweep(published: CalibratedContactModel) -> np.ndarray:
     bounds = published.sinkage_validity
     return np.linspace(max(bounds.min, bounds.max * 1e-6), bounds.max, CURVE_SAMPLES)
+
+
+def _band(
+    series: PressureSinkageSeries, half_width: float
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    selected = series.observations.for_plate(half_width)
+    order = np.argsort(selected.sinkage_m)
+    sinkage = selected.sinkage_m[order] * 1e3
+    pressure = selected.pressure_kPa[order]
+    centres, lower, upper = [], [], []
+    start = 0
+    for index in range(1, sinkage.size + 1):
+        if index == sinkage.size or sinkage[index] - sinkage[start] > BAND_COLUMN_TOLERANCE_MM:
+            centres.append(sinkage[start:index].mean())
+            lower.append(pressure[start:index].min())
+            upper.append(pressure[start:index].max())
+            start = index
+    return np.array(centres), np.array(lower), np.array(upper)
+
+
+def _draw_bands(
+    axes: Axes, series: PressureSinkageSeries, half_widths: list[float]
+) -> None:
+    for index, half_width in enumerate(half_widths):
+        centres, lower, upper = _band(series, half_width)
+        if not centres.size:
+            continue
+        colour = _plate_colour(index)
+        axes.fill_between(
+            centres, lower, upper, color=colour, alpha=BAND_FILL_ALPHA,
+            linewidth=0.0, zorder=2,
+        )
+        for edge in (lower, upper):
+            axes.plot(centres, edge, color=colour, linewidth=0.6, alpha=0.6, zorder=3)
+
+
+def _draw_observations(
+    axes: Axes, series: PressureSinkageSeries, half_widths: list[float]
+) -> None:
+    for index, half_width in enumerate(half_widths):
+        selected = series.observations.for_plate(half_width)
+        axes.plot(
+            selected.sinkage_m * 1e3,
+            selected.pressure_kPa,
+            marker="o",
+            markersize=3.4,
+            markerfacecolor=SURFACE,
+            markeredgecolor=_plate_colour(index),
+            markeredgewidth=0.9,
+            linestyle="none",
+            zorder=5,
+        )
 
 
 def _draw_curves(
@@ -150,38 +200,20 @@ def _draw_curves(
     half_widths: list[float],
     depth: np.ndarray,
 ) -> None:
-    endpoints: list[float] = []
     for index, half_width in enumerate(half_widths):
         for model_id, model in models.items():
-            pressure = model.pressure(sinkage=depth, contact_half_width=half_width)
             axes.plot(
                 depth * 1e3,
-                pressure,
-                color=_plate_colour(index),
-                linewidth=1.5,
-                linestyle=MODEL_LINESTYLES[model_id],
-                zorder=3,
+                model.pressure(sinkage=depth, contact_half_width=half_width),
+                color=_plate_colour(index), linewidth=1.5,
+                linestyle=MODEL_LINESTYLES[model_id], zorder=4,
             )
-            if model_id == REFERENCE_MODEL:
-                endpoints.append(float(pressure[-1]))
 
-    axes.set_ylim(bottom=0.0, top=max(endpoints) * 1.08)
-    gap = axes.get_ylim()[1] * LABEL_MINIMUM_GAP_FRACTION
-    for index, height in enumerate(_separated(endpoints, gap)):
-        axes.annotate(
-            f"b = {half_widths[index] * 1e3:.1f} mm",
-            xy=(depth[-1] * 1e3, height),
-            xytext=(5, 0),
-            textcoords="offset points",
-            color=INK_SECONDARY,
-            fontsize=8.5,
-            va="center",
-            annotation_clip=False,
-        )
+    axes.set_ylim(bottom=0.0)
 
 
-def _legend_handles(has_series: bool) -> list[Line2D]:
-    handles = [
+def _legend_handles(has_series: bool) -> list[Any]:
+    handles: list[Any] = [
         Line2D(
             [], [], color=INK_SECONDARY, linewidth=1.5,
             linestyle=MODEL_LINESTYLES[model_id],
@@ -192,36 +224,33 @@ def _legend_handles(has_series: bool) -> list[Line2D]:
     if has_series:
         handles.append(
             Line2D(
-                [], [], color=INK_SECONDARY, marker="o", markersize=3.5,
-                markerfacecolor=SURFACE, linestyle="none", label="digitized points",
+                [], [], color=INK_SECONDARY, marker="o", markersize=3.4,
+                markerfacecolor=SURFACE, markeredgewidth=0.9, linestyle="none",
+                label="digitized points",
             )
+        )
+        handles.append(
+            Patch(facecolor=INK_SECONDARY, alpha=BAND_FILL_ALPHA,
+                  label="replicate spread")
         )
     return handles
 
 
-def _draw_observations(
-    axes: Axes,
-    series: PressureSinkageSeries,
+def _plate_legend_handles(
     half_widths: list[float],
-) -> None:
+    published: CalibratedContactModel,
+    series: PressureSinkageSeries | None,
+) -> list[Any]:
+    handles: list[Any] = []
     for index, half_width in enumerate(half_widths):
-        selected = series.observations.for_plate(half_width)
-        axes.errorbar(
-            selected.sinkage_m * 1e3,
-            selected.pressure_kPa,
-            xerr=series.digitization.sinkage_uncertainty_m * 1e3,
-            yerr=series.digitization.pressure_uncertainty_kPa,
-            fmt="o",
-            markersize=3.5,
-            markerfacecolor=SURFACE,
-            markeredgecolor=_plate_colour(index),
-            markeredgewidth=1.1,
-            ecolor=INK_MUTED,
-            elinewidth=0.7,
-            capsize=0,
-            linestyle="none",
-            zorder=5,
-        )
+        label = f"b = {half_width * 1e3:.1f} mm"
+        if series is not None:
+            residual = mean_relative_residual(
+                published.extrapolating, series.observations.for_plate(half_width)
+            )
+            label += f"    band {residual * 100:+.1f}%"
+        handles.append(Patch(facecolor=_plate_colour(index), label=label))
+    return handles
 
 
 def build_figure(
@@ -232,16 +261,25 @@ def build_figure(
 ) -> Figure:
     published = models[REFERENCE_MODEL]
     depth = _sinkage_sweep(published)
-    with plt.rc_context(FIGURE_STYLE):
+    with plt.rc_context(cast(Any, FIGURE_STYLE)):
         figure, axes = plt.subplots()
-        _draw_curves(axes, models, half_widths, depth)
         if series is not None:
+            _draw_bands(axes, series, half_widths)
             _draw_observations(axes, series, half_widths)
+        _draw_curves(axes, models, half_widths, depth)
 
         axes.set_xlabel("sinkage  (mm)")
         axes.set_ylabel("pressure  (kPa)")
-        axes.set_xlim(0.0, published.sinkage_validity.max * 1e3 * 1.17)
-        axes.legend(handles=_legend_handles(series is not None), loc="upper left")
+        axes.set_xlim(0.0, published.sinkage_validity.max * 1e3 * 1.02)
+        style_legend = axes.legend(
+            handles=_legend_handles(series is not None), loc="upper left"
+        )
+        axes.add_artist(style_legend)
+        axes.legend(
+            handles=_plate_legend_handles(half_widths, published, series),
+            loc="upper left",
+            bbox_to_anchor=(0.0, PLATE_LEGEND_ANCHOR),
+        )
         axes.spines["top"].set_visible(False)
         axes.spines["right"].set_visible(False)
         axes.set_axisbelow(True)
@@ -252,22 +290,22 @@ def build_figure(
             if series is None
             else (
                 f"{series.observations.count} points digitized from "
-                f"{series.source.figure} of {series.source.doi},\n"
-                "shown with their digitization uncertainty."
+                f"{series.source.figure} of {series.source.doi}.\nShaded bands span "
+                "the replicate scatter at each sampled sinkage."
             )
         )
         figure.text(
-            0.100, 0.960,
+            0.085, 0.965,
             f"KLS-1 pressure-sinkage: {REFERENCE_MODEL.title()} against "
             f"{COMPARED_MODEL.title()}",
             fontsize=12, color=INK_PRIMARY, weight="bold", ha="left", va="top",
         )
         figure.text(
-            0.100, 0.908, subtitle,
+            0.085, 0.922, subtitle,
             fontsize=8.5, color=INK_SECONDARY, ha="left", va="top",
         )
         figure.text(
-            0.100, 0.098,
+            0.085, 0.098,
             "Plotted only within the fitted range: contact half-width "
             f"{published.contact_half_width_validity.min * 1e3:.1f}"
             f"–{published.contact_half_width_validity.max * 1e3:.1f} mm, "
@@ -299,7 +337,7 @@ def build_report(
     half_widths: list[float],
     soil_path: Path,
     series: PressureSinkageSeries | None,
-    fits: dict[str, FittedContactModel],
+    fits: dict[tuple[str, str], FittedContactModel],
 ) -> str:
     depth = _sinkage_sweep(models[REFERENCE_MODEL])
     lines = [
@@ -369,14 +407,29 @@ def build_report(
             ]
         )
 
-    for model_id, fit in fits.items() if series is not None else ():
+    if series is not None:
+        lines.extend(["", "[band_residual]", "# mean relative residual of the",
+                      "# digitized band against each published model"])
+        for model_id, model in models.items():
+            rows = ", ".join(
+                f"{{ contact_half_width_m = {_format_float(half_width)}, "
+                f"mean_relative_residual = "
+                f"{_format_float(mean_relative_residual(model.extrapolating, series.observations.for_plate(half_width)))} }}"
+                for half_width in half_widths
+            )
+            lines.append(f"{model_id} = [{rows}]")
+
+    if series is None:
+        return "\n".join(lines) + "\n"
+
+    for (model_id, weighting), fit in fits.items():
         published = models[model_id]
         lines.extend(
             [
                 "",
                 "[[fit]]",
                 f'model = "{model_id}"',
-                f'weighting = "{fit.weighting}"',
+                f'weighting = "{weighting}"',
                 f"observation_count = {fit.observation_count}",
                 f"plate_count = {fit.plate_count}",
                 "coefficient_of_determination = "
@@ -445,7 +498,7 @@ def main(argv: list[str] | None = None) -> int:
     half_widths = [plate.contact_half_width_m for plate in dataset.apparatus.plates]
 
     series: PressureSinkageSeries | None = None
-    fits: dict[str, FittedContactModel] = {}
+    fits: dict[tuple[str, str], FittedContactModel] = {}
     if arguments.series.is_file():
         try:
             series = load_pressure_sinkage_series(arguments.series)
@@ -453,8 +506,11 @@ def main(argv: list[str] | None = None) -> int:
             print(f"cannot read the digitized series: {error}", file=sys.stderr)
             return 1
         fits = {
-            model_id: fit_contact_model(model_id, series.observations)
+            (model_id, weighting): fit_contact_model(
+                model_id, series.observations, weighting=weighting
+            )
             for model_id in models
+            for weighting in WEIGHTINGS
         }
     else:
         print(
@@ -480,8 +536,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f"models   {', '.join(models)}")
     if series is not None:
         print(f"series   {series.id}, {series.observations.count} points")
-        for model_id, fit in fits.items():
-            print(f"  {model_id}, weighting {fit.weighting}")
+        for (model_id, weighting), fit in fits.items():
+            marker = " (default)" if weighting == DEFAULT_WEIGHTING else ""
+            print(f"  {model_id}, weighting {weighting}{marker}")
             print("\n".join(_comparison_rows(models[model_id], fit)))
     print(f"figure   {arguments.figure}")
     print(f"report   {arguments.report}")

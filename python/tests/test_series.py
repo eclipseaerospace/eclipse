@@ -33,6 +33,8 @@ def test_a_valid_pair_loads(digitized_series: Path) -> None:
     assert series.source.doi == "10.5140/JASS.2021.38.4.237"
     assert series.digitization.method == "exact_model_evaluation"
     assert series.observations.count == 60
+    assert series.distinct_tests == 2
+    assert len(series.test_ids) == 60
     assert len(series.contact_half_widths) == 3
     assert series.series_path.is_file()
     assert set(series.digitization.axis_calibration) == {"x", "y"}
@@ -119,7 +121,7 @@ def test_an_unexpected_manifest_key_is_refused(digitized_series: Path) -> None:
 def test_declared_columns_must_match_the_schema(digitized_series: Path) -> None:
     _corrupt(
         digitized_series,
-        'columns = ["contact_half_width_m", "sinkage_m", "pressure_kPa"]',
+        'columns = ["contact_half_width_m", "test_id", "sinkage_m", "pressure_kPa"]',
         'columns = ["sinkage_m", "pressure_kPa"]',
     )
     with pytest.raises(SeriesFileError, match="must declare"):
@@ -142,7 +144,7 @@ def _rewrite_csv(digitized_series: Path, text: str) -> Path:
 
 
 def test_a_csv_header_that_does_not_match_is_refused(digitized_series: Path) -> None:
-    _rewrite_csv(digitized_series, "a,b,c\n0.03,0.01,10.0\n")
+    _rewrite_csv(digitized_series, "a,b,c,d\n0.03,r1,0.01,10.0\n")
     with pytest.raises(SeriesFileError, match="header is"):
         load_pressure_sinkage_series(digitized_series)
 
@@ -150,14 +152,14 @@ def test_a_csv_header_that_does_not_match_is_refused(digitized_series: Path) -> 
 def test_a_non_numeric_cell_is_refused(digitized_series: Path) -> None:
     _rewrite_csv(
         digitized_series,
-        "contact_half_width_m,sinkage_m,pressure_kPa\n0.03,0.01,not-a-number\n",
+        "contact_half_width_m,test_id,sinkage_m,pressure_kPa\n0.03,r1,0.01,x\n",
     )
     with pytest.raises(SeriesFileError, match="which is not a number"):
         load_pressure_sinkage_series(digitized_series)
 
 
 def test_a_csv_with_no_observations_is_refused(digitized_series: Path) -> None:
-    _rewrite_csv(digitized_series, "contact_half_width_m,sinkage_m,pressure_kPa\n")
+    _rewrite_csv(digitized_series, "contact_half_width_m,test_id,sinkage_m,pressure_kPa\n")
     with pytest.raises(SeriesFileError, match="no observations"):
         load_pressure_sinkage_series(digitized_series)
 
@@ -167,8 +169,8 @@ def test_a_zero_sinkage_row_is_refused_with_the_fitting_reason(
 ) -> None:
     _rewrite_csv(
         digitized_series,
-        "contact_half_width_m,sinkage_m,pressure_kPa\n"
-        "0.03,0.0,0.0\n0.03,0.02,10.0\n0.035,0.02,11.0\n",
+        "contact_half_width_m,test_id,sinkage_m,pressure_kPa\n"
+        "0.03,r1,0.0,0.0\n0.03,r1,0.02,10.0\n0.035,r1,0.02,11.0\n",
     )
     with pytest.raises(SeriesFileError, match="strictly positive for a log-space"):
         load_pressure_sinkage_series(digitized_series)

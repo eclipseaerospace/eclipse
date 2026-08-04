@@ -13,10 +13,14 @@ numpy = "2.5.1"
 
 [inputs]
 soil = "data/soils/kls1.toml"
-soil_sha256 = "9886222818c145efeac329016479079f610d8c4da747cd523054b5c3cfac16c5"
+soil_sha256 = "0e5200842e2f6ca594feda10b70aaa393e8cf9d31c6c37ecfdb566da2623e9f0"
 soil_id = "kls1"
 dataset_id = "lim2021"
 doi = "10.5140/JASS.2021.38.4.237"
+series = "data/literature/lim2021-pressure-sinkage.toml"
+series_manifest_sha256 = "5736e3ca7e3463725d9740541278ffd219626949c61cec19150934146ad3c673"
+series_sha256 = "79d790764c85e9389e655e2e5c95944d4e254285cc82dd9da7bed1e60edb37a3"
+observation_count = 202
 
 [model_comparison]
 reference = "bekker"
@@ -38,3 +42,45 @@ model = "reece"
 fit_method = "weighted_least_squares_wong1980"
 minimum_invertible_half_width_m = 0.016062086870165023
 parameters = { sinkage_exponent = 1.2594, cohesive_modulus = -29.0317, frictional_modulus = 1807.4675 }
+
+[band_residual]
+# mean relative residual of the
+# digitized band against each published model
+bekker = [{ contact_half_width_m = 0.03, mean_relative_residual = 0.0503704629029941 }, { contact_half_width_m = 0.035, mean_relative_residual = -0.10232980791569529 }, { contact_half_width_m = 0.0375, mean_relative_residual = 0.07965949423465521 }]
+reece = [{ contact_half_width_m = 0.03, mean_relative_residual = 0.06444040058354251 }, { contact_half_width_m = 0.035, mean_relative_residual = -0.10632715542132781 }, { contact_half_width_m = 0.0375, mean_relative_residual = 0.07311153022895607 }]
+
+[[fit]]
+model = "bekker"
+weighting = "uniform"
+observation_count = 202
+plate_count = 3
+coefficient_of_determination = 0.9660752670263183
+parameters = { cohesive_modulus = -43.3807524125885, frictional_modulus = 3754.2868123251083, sinkage_exponent = 1.2843799280019934 }
+relative_deviation_from_published = { cohesive_modulus = -0.01531361847608918, frictional_modulus = 0.04815335917681088, sinkage_exponent = 0.019834784819750144 }
+
+[[fit]]
+model = "bekker"
+weighting = "pressure_squared"
+observation_count = 202
+plate_count = 3
+coefficient_of_determination = 0.9661917683010747
+parameters = { cohesive_modulus = -50.248544187654964, frictional_modulus = 3905.3957583114716, sinkage_exponent = 1.2756842006438256 }
+relative_deviation_from_published = { cohesive_modulus = 0.14057627867764147, frictional_modulus = 0.09034122527625324, sinkage_exponent = 0.01293012596778269 }
+
+[[fit]]
+model = "reece"
+weighting = "uniform"
+observation_count = 202
+plate_count = 3
+coefficient_of_determination = 0.9652937173051876
+parameters = { cohesive_modulus = -28.794481795735816, frictional_modulus = 1797.0746856030505, sinkage_exponent = 1.2843799280019934 }
+relative_deviation_from_published = { cohesive_modulus = -0.008171006322887898, frictional_modulus = -0.005749931546182413, sinkage_exponent = 0.019834784819750144 }
+
+[[fit]]
+model = "reece"
+weighting = "pressure_squared"
+observation_count = 202
+plate_count = 3
+coefficient_of_determination = 0.964781891037309
+parameters = { cohesive_modulus = -31.09670680599811, frictional_modulus = 1873.1593413588807, sinkage_exponent = 1.2756842006438256 }
+relative_deviation_from_published = { cohesive_modulus = 0.07112937947134028, frictional_modulus = 0.03634468744742617, sinkage_exponent = 0.01293012596778269 }

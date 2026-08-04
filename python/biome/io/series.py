@@ -41,7 +41,13 @@ __all__ = [
 
 SUPPORTED_SCHEMA_VERSIONS: Final = frozenset({1})
 PRESSURE_SINKAGE_KIND: Final = "pressure_sinkage"
-REQUIRED_COLUMNS: Final = ("contact_half_width_m", "sinkage_m", "pressure_kPa")
+REQUIRED_COLUMNS: Final = (
+    "contact_half_width_m",
+    "test_id",
+    "sinkage_m",
+    "pressure_kPa",
+)
+NUMERIC_COLUMNS: Final = ("contact_half_width_m", "sinkage_m", "pressure_kPa")
 
 _Constructed = TypeVar("_Constructed")
 
@@ -120,8 +126,20 @@ class PressureSinkageSeries:
     source: Source
     digitization: Digitization
     observations: PressureSinkageObservations
+    test_ids: tuple[str, ...]
     manifest_path: Path
     series_path: Path
+
+    def __post_init__(self) -> None:
+        if len(self.test_ids) != self.observations.count:
+            raise SeriesFileError(
+                f"{len(self.test_ids)} test identifiers for "
+                f"{self.observations.count} observations"
+            )
+
+    @property
+    def distinct_tests(self) -> int:
+        return len(set(self.test_ids))
 
     @property
     def contact_half_widths(self) -> Sequence[float]:
@@ -133,7 +151,7 @@ class PressureSinkageSeries:
 
 def _read_observations(
     path: Path, declared_columns: Sequence[str]
-) -> PressureSinkageObservations:
+) -> tuple[PressureSinkageObservations, tuple[str, ...]]:
     if tuple(declared_columns) != REQUIRED_COLUMNS:
         raise SeriesFileError(
             f"{path}: manifest declares columns {list(declared_columns)}, but a "
@@ -146,9 +164,11 @@ def _read_observations(
                 f"{path}: header is {reader.fieldnames}, expected "
                 f"{list(REQUIRED_COLUMNS)}"
             )
-        columns: dict[str, list[float]] = {name: [] for name in REQUIRED_COLUMNS}
+        columns: dict[str, list[float]] = {name: [] for name in NUMERIC_COLUMNS}
+        test_ids: list[str] = []
         for number, row in enumerate(reader, start=2):
-            for name in REQUIRED_COLUMNS:
+            test_ids.append(row["test_id"])
+            for name in NUMERIC_COLUMNS:
                 cell = row[name]
                 try:
                     columns[name].append(float(cell))
@@ -157,16 +177,17 @@ def _read_observations(
                         f"{path} line {number}: column {name} holds {cell!r}, "
                         "which is not a number"
                     ) from error
-    if not columns[REQUIRED_COLUMNS[0]]:
+    if not columns[NUMERIC_COLUMNS[0]]:
         raise SeriesFileError(f"{path}: holds a header but no observations")
     try:
-        return PressureSinkageObservations(
+        observations = PressureSinkageObservations(
             contact_half_width_m=np.array(columns["contact_half_width_m"]),
             sinkage_m=np.array(columns["sinkage_m"]),
             pressure_kPa=np.array(columns["pressure_kPa"]),
         )
     except ValueError as error:
         raise SeriesFileError(f"{path}: {error}") from error
+    return observations, tuple(test_ids)
 
 
 def load_pressure_sinkage_series(manifest_path: Path | str) -> PressureSinkageSeries:
@@ -214,6 +235,9 @@ def load_pressure_sinkage_series(manifest_path: Path | str) -> PressureSinkageSe
             "numbers; update the manifest deliberately"
         )
 
+    observations, test_ids = _read_observations(
+        series_path, series_table.get("columns", ())
+    )
     return _construct(
         PressureSinkageSeries,
         {
@@ -226,9 +250,8 @@ def load_pressure_sinkage_series(manifest_path: Path | str) -> PressureSinkageSe
             "digitization": _construct(
                 Digitization, digitization_table, f"{context} digitization"
             ),
-            "observations": _read_observations(
-                series_path, series_table.get("columns", ())
-            ),
+            "observations": observations,
+            "test_ids": test_ids,
             "manifest_path": manifest_path,
             "series_path": series_path,
         },

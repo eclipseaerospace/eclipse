@@ -23,6 +23,7 @@ from biome.fitting import (
     coefficient_of_determination_by_plate,
     fit_contact_model,
     fit_shared_power_law,
+    mean_relative_residual,
     relative_deviation,
 )
 from biome.io.soil import CalibratedContactModel
@@ -269,3 +270,27 @@ def test_deviation_at_zero_sinkage_is_refused(
             sinkage=0.0,
             contact_half_width=0.03,
         )
+
+
+def test_mean_relative_residual_is_zero_for_the_generating_model(
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+) -> None:
+    bekker = published_models["bekker"]
+    observations = observations_from(bekker, tested_half_widths)
+    assert mean_relative_residual(bekker, observations) == pytest.approx(0.0, abs=1e-12)
+
+
+def test_mean_relative_residual_carries_the_sign_of_the_offset(
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+) -> None:
+    bekker = published_models["bekker"]
+    exact = observations_from(bekker, tested_half_widths)
+    for factor, expected in ((1.10, 0.10), (0.90, -0.10)):
+        lifted = PressureSinkageObservations(
+            contact_half_width_m=exact.contact_half_width_m,
+            sinkage_m=exact.sinkage_m,
+            pressure_kPa=exact.pressure_kPa * factor,
+        )
+        assert mean_relative_residual(bekker, lifted) == pytest.approx(expected, abs=1e-9)

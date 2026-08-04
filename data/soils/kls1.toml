@@ -163,7 +163,7 @@ status     = "not_reproducible"
 fit_method = "unweighted_least_squares"
 
 [dataset.model.parameters]
-inverse_sinkage_exponent = { value =    1.261543, units = "1",   sigma = nan }
+sinkage_exponent         = { value =    0.79268,  units = "1",   sigma = nan }
 plate_scaling_slope      = { value = 2320.5507,   units = "1/m", sigma = nan }
 plate_scaling_intercept  = { value = -174.9706,   units = "1",   sigma = nan }
 

@@ -51,6 +51,7 @@ __all__ = [
     "coefficient_of_determination_by_plate",
     "fit_contact_model",
     "fit_shared_power_law",
+    "mean_relative_residual",
     "relative_deviation",
 ]
 
@@ -271,6 +272,16 @@ def relative_deviation(
         sinkage=sinkage, contact_half_width=contact_half_width
     )
     return np.asarray((other_pressure - reference_pressure) / reference_pressure)
+
+
+def mean_relative_residual(
+    model: ContactModel, observations: PressureSinkageObservations
+) -> float:
+    predicted = model.pressure(
+        sinkage=observations.sinkage_m,
+        contact_half_width=observations.contact_half_width_m,
+    )
+    return float(np.mean((observations.pressure_kPa - predicted) / predicted))
 
 
 def coefficient_of_determination(

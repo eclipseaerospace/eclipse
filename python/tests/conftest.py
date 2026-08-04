@@ -27,6 +27,7 @@ from biome.io.soil import CalibratedContactModel, load_soil
 REPOSITORY_ROOT: Final = Path(__file__).resolve().parents[2]
 REFERENCE_SOIL_PATH: Final = REPOSITORY_ROOT / "data" / "soils" / "kls1.toml"
 SINKAGE_SAMPLES: Final = 20
+REPLICATES: Final = 2
 
 MANIFEST_TEMPLATE: Final = """schema_version = 1
 id = "test-series"
@@ -52,7 +53,7 @@ y = {{ minimum = 0.0, maximum = 130.0, units = "kPa", scale = "linear" }}
 [series]
 path = "{csv_name}"
 sha256 = "{sha256}"
-columns = ["contact_half_width_m", "sinkage_m", "pressure_kPa"]
+columns = ["contact_half_width_m", "test_id", "sinkage_m", "pressure_kPa"]
 """
 
 
@@ -84,13 +85,20 @@ def observations_from(
 
 
 def write_series(directory: Path, observations: PressureSinkageObservations) -> Path:
-    rows = ["contact_half_width_m,sinkage_m,pressure_kPa"]
+    test_identifiers = [
+        f"run-{index % REPLICATES + 1}" for index in range(observations.count)
+    ]
+    rows = ["contact_half_width_m,test_id,sinkage_m,pressure_kPa"]
     rows.extend(
-        f"{float(half_width)!r},{float(sinkage)!r},{float(pressure)!r}"
-        for half_width, sinkage, pressure in zip(
-            observations.contact_half_width_m,
-            observations.sinkage_m,
-            observations.pressure_kPa,
+        f"{float(half_width)!r},{test_id},{float(sinkage)!r},{float(pressure)!r}"
+        for test_id, (half_width, sinkage, pressure) in zip(
+            test_identifiers,
+            zip(
+                observations.contact_half_width_m,
+                observations.sinkage_m,
+                observations.pressure_kPa,
+                strict=True,
+            ),
             strict=True,
         )
     )
