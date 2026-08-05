@@ -21,6 +21,7 @@ from biome.fitting import (
     WeightingScheme,
     coefficient_of_determination,
     coefficient_of_determination_by_plate,
+    coefficient_of_determination_ceiling,
     fit_contact_model,
     fit_shared_power_law,
     mean_relative_residual,
@@ -294,3 +295,48 @@ def test_mean_relative_residual_carries_the_sign_of_the_offset(
             pressure_kPa=exact.pressure_kPa * factor,
         )
         assert mean_relative_residual(bekker, lifted) == pytest.approx(expected, abs=1e-9)
+
+
+def test_the_determination_ceiling_is_one_without_replicates(
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+) -> None:
+    exact = observations_from(published_models["bekker"], tested_half_widths)
+    assert coefficient_of_determination_ceiling(exact) == pytest.approx(1.0, abs=1e-12)
+
+
+def test_the_determination_ceiling_falls_with_replicate_scatter(
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+) -> None:
+    exact = observations_from(published_models["bekker"], tested_half_widths)
+    generator = np.random.default_rng(20260805)
+    previous = 1.0
+    for spread in (0.02, 0.05, 0.10):
+        duplicated = PressureSinkageObservations(
+            contact_half_width_m=np.tile(exact.contact_half_width_m, 4),
+            sinkage_m=np.tile(exact.sinkage_m, 4),
+            pressure_kPa=np.tile(exact.pressure_kPa, 4)
+            * (1.0 + generator.normal(0.0, spread, exact.count * 4)),
+        )
+        ceiling = coefficient_of_determination_ceiling(duplicated)
+        assert ceiling < previous, "wider replicate scatter must lower the ceiling"
+        previous = ceiling
+
+
+def test_no_fit_can_beat_the_determination_ceiling(
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+) -> None:
+    exact = observations_from(published_models["bekker"], tested_half_widths)
+    generator = np.random.default_rng(20260805)
+    scattered = PressureSinkageObservations(
+        contact_half_width_m=np.tile(exact.contact_half_width_m, 5),
+        sinkage_m=np.tile(exact.sinkage_m, 5),
+        pressure_kPa=np.tile(exact.pressure_kPa, 5)
+        * (1.0 + generator.normal(0.0, 0.06, exact.count * 5)),
+    )
+    fitted = fit_contact_model("bekker", scattered)
+    assert coefficient_of_determination(fitted.model, scattered) <= (
+        coefficient_of_determination_ceiling(scattered) + 1e-9
+    )

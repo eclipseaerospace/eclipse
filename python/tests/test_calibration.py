@@ -185,3 +185,35 @@ def test_a_soil_without_both_models_is_refused(tmp_path: Path) -> None:
     )
     assert completed.returncode != 0
     assert "no verified model" in completed.stderr
+
+
+def test_a_series_too_small_to_fit_is_reported_not_raised(
+    tmp_path: Path, digitized_series: Path
+) -> None:
+    csv_path = digitized_series.parent / "series.csv"
+    lines = csv_path.read_text(encoding="utf-8").splitlines()
+    single = [lines[0]] + [row for row in lines[1:] if row.startswith("0.03,")]
+    csv_path.write_text("\n".join(single) + "\n", encoding="utf-8")
+    manifest = digitized_series.read_text(encoding="utf-8")
+    stale = next(
+        line.split('"')[1] for line in manifest.splitlines() if line.startswith("sha256")
+    )
+    digitized_series.write_text(
+        manifest.replace(
+            stale, hashlib.sha256(csv_path.read_bytes()).hexdigest()
+        ),
+        encoding="utf-8",
+    )
+
+    figure = tmp_path / "figure.png"
+    report = tmp_path / "report.toml"
+    completed = _run("--series", digitized_series, "--figure", figure, "--report", report)
+    assert completed.returncode == 0, completed.stderr
+    assert "cannot support a fit" in completed.stderr
+    assert "Traceback" not in completed.stderr, (
+        "one plate is a data limitation, not a crash:\n" + completed.stderr
+    )
+    assert figure.is_file(), "the published models are still worth plotting"
+    table = tomllib.loads(report.read_text(encoding="utf-8"))
+    assert "fit" not in table, "nothing was fitted, so the report must not claim a fit"
+    assert "band_residual" in table, "the band is still measurable against one plate"

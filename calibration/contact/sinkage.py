@@ -44,6 +44,7 @@ from matplotlib.patches import Patch
 
 from biome.fitting import (
     DEFAULT_WEIGHTING,
+    coefficient_of_determination_ceiling,
     FittedContactModel,
     WeightingScheme,
     coefficient_of_determination,
@@ -142,6 +143,14 @@ def _sinkage_sweep(published: CalibratedContactModel) -> np.ndarray:
     return np.linspace(max(bounds.min, bounds.max * 1e-6), bounds.max, CURVE_SAMPLES)
 
 
+def _plate_observation_count(
+    series: PressureSinkageSeries, half_width: float
+) -> int:
+    return int(
+        np.count_nonzero(series.observations.contact_half_width_m == half_width)
+    )
+
+
 def _band(
     series: PressureSinkageSeries, half_width: float
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -164,6 +173,8 @@ def _draw_bands(
     axes: Axes, series: PressureSinkageSeries, half_widths: list[float]
 ) -> None:
     for index, half_width in enumerate(half_widths):
+        if _plate_observation_count(series, half_width) < 2:
+            continue
         centres, lower, upper = _band(series, half_width)
         if not centres.size:
             continue
@@ -180,6 +191,8 @@ def _draw_observations(
     axes: Axes, series: PressureSinkageSeries, half_widths: list[float]
 ) -> None:
     for index, half_width in enumerate(half_widths):
+        if _plate_observation_count(series, half_width) < 2:
+            continue
         selected = series.observations.for_plate(half_width)
         axes.plot(
             selected.sinkage_m * 1e3,
@@ -244,7 +257,7 @@ def _plate_legend_handles(
     handles: list[Any] = []
     for index, half_width in enumerate(half_widths):
         label = f"b = {half_width * 1e3:.1f} mm"
-        if series is not None:
+        if series is not None and _plate_observation_count(series, half_width) >= 2:
             residual = mean_relative_residual(
                 published.extrapolating, series.observations.for_plate(half_width)
             )
@@ -354,6 +367,13 @@ def build_report(
         f'python = "{platform.python_version()}"',
         f'numpy = "{np.__version__}"',
         "",
+        "# Two fits per model. Wong (1980) prescribes weighting each log residual",
+        "# by the squared pressure and this dataset cites that method, yet uniform",
+        "# weighting reproduces the published parameters far better. Sampling",
+        "# density does not explain it: the bevameter ran displacement-controlled,",
+        "# so its samples and these digitized columns are both uniform in sinkage.",
+        "# The discrepancy is recorded, not resolved.",
+        "",
         "[inputs]",
         f'soil = "{_display_path(soil_path)}"',
         f'soil_sha256 = "{_digest(soil_path)}"',
@@ -368,6 +388,10 @@ def build_report(
                 f'series_manifest_sha256 = "{_digest(series.manifest_path)}"',
                 f'series_sha256 = "{_digest(series.series_path)}"',
                 f"observation_count = {series.observations.count}",
+                "coefficient_of_determination_ceiling = "
+                + _format_float(
+                    coefficient_of_determination_ceiling(series.observations)
+                ),
             ]
         )
 
@@ -416,6 +440,7 @@ def build_report(
                 f"mean_relative_residual = "
                 f"{_format_float(mean_relative_residual(model.extrapolating, series.observations.for_plate(half_width)))} }}"
                 for half_width in half_widths
+                if _plate_observation_count(series, half_width) >= 2
             )
             lines.append(f"{model_id} = [{rows}]")
 
@@ -505,13 +530,20 @@ def main(argv: list[str] | None = None) -> int:
         except SeriesFileError as error:
             print(f"cannot read the digitized series: {error}", file=sys.stderr)
             return 1
-        fits = {
-            (model_id, weighting): fit_contact_model(
-                model_id, series.observations, weighting=weighting
+        try:
+            fits = {
+                (model_id, weighting): fit_contact_model(
+                    model_id, series.observations, weighting=weighting
+                )
+                for model_id in models
+                for weighting in WEIGHTINGS
+            }
+        except ValueError as error:
+            print(
+                f"the series loaded but cannot support a fit: {error}. "
+                "Plotting the published models against it instead.",
+                file=sys.stderr,
             )
-            for model_id in models
-            for weighting in WEIGHTINGS
-        }
     else:
         print(
             f"no digitized series at {arguments.series}, so the figure shows "

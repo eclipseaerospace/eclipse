@@ -49,6 +49,7 @@ __all__ = [
     "WeightingScheme",
     "coefficient_of_determination",
     "coefficient_of_determination_by_plate",
+    "coefficient_of_determination_ceiling",
     "fit_contact_model",
     "fit_shared_power_law",
     "mean_relative_residual",
@@ -58,6 +59,7 @@ __all__ = [
 WeightingScheme = Literal["uniform", "pressure_squared"]
 DEFAULT_WEIGHTING: Final[WeightingScheme] = "pressure_squared"
 MINIMUM_PLATES_FOR_PLATE_SCALING: Final = 2
+DEFAULT_REPLICATE_TOLERANCE_M: Final = 2e-3
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -282,6 +284,33 @@ def mean_relative_residual(
         contact_half_width=observations.contact_half_width_m,
     )
     return float(np.mean((observations.pressure_kPa - predicted) / predicted))
+
+
+def coefficient_of_determination_ceiling(
+    observations: PressureSinkageObservations,
+    *,
+    sinkage_tolerance_m: float = DEFAULT_REPLICATE_TOLERANCE_M,
+) -> float:
+    measured = observations.pressure_kPa
+    total = float(np.sum(np.square(measured - np.mean(measured))))
+    if total == 0.0:
+        return float("nan")
+
+    pure_error = 0.0
+    for half_width in observations.contact_half_widths:
+        plate = observations.for_plate(float(half_width))
+        order = np.argsort(plate.sinkage_m)
+        sinkage, pressure = plate.sinkage_m[order], plate.pressure_kPa[order]
+        start = 0
+        for index in range(1, sinkage.size + 1):
+            if (
+                index == sinkage.size
+                or sinkage[index] - sinkage[start] > sinkage_tolerance_m
+            ):
+                group = pressure[start:index]
+                pure_error += float(np.sum(np.square(group - np.mean(group))))
+                start = index
+    return 1.0 - pure_error / total
 
 
 def coefficient_of_determination(

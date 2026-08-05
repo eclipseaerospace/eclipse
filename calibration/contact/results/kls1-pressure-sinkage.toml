@@ -11,6 +11,13 @@ generated_by = "calibration/contact/sinkage.py"
 python = "3.12.13"
 numpy = "2.5.1"
 
+# Two fits per model. Wong (1980) prescribes weighting each log residual
+# by the squared pressure and this dataset cites that method, yet uniform
+# weighting reproduces the published parameters far better. Sampling
+# density does not explain it: the bevameter ran displacement-controlled,
+# so its samples and these digitized columns are both uniform in sinkage.
+# The discrepancy is recorded, not resolved.
+
 [inputs]
 soil = "data/soils/kls1.toml"
 soil_sha256 = "0e5200842e2f6ca594feda10b70aaa393e8cf9d31c6c37ecfdb566da2623e9f0"
@@ -21,6 +28,7 @@ series = "data/literature/lim2021-pressure-sinkage.toml"
 series_manifest_sha256 = "5736e3ca7e3463725d9740541278ffd219626949c61cec19150934146ad3c673"
 series_sha256 = "79d790764c85e9389e655e2e5c95944d4e254285cc82dd9da7bed1e60edb37a3"
 observation_count = 202
+coefficient_of_determination_ceiling = 0.9891015256377954
 
 [model_comparison]
 reference = "bekker"
