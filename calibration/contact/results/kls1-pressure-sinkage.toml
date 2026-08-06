@@ -57,6 +57,53 @@ parameters = { sinkage_exponent = 1.2594, cohesive_modulus = -29.0317, frictiona
 bekker = [{ contact_half_width_m = 0.03, mean_relative_residual = 0.0503704629029941 }, { contact_half_width_m = 0.035, mean_relative_residual = -0.10232980791569529 }, { contact_half_width_m = 0.0375, mean_relative_residual = 0.07965949423465521 }]
 reece = [{ contact_half_width_m = 0.03, mean_relative_residual = 0.06444040058354251 }, { contact_half_width_m = 0.035, mean_relative_residual = -0.10632715542132781 }, { contact_half_width_m = 0.0375, mean_relative_residual = 0.07311153022895607 }]
 
+# Per-figure axis-calibration bias, measured by tracing the published
+# Bekker curve on each source figure and comparing against the
+# transcribed parameters. Points below the minimum sinkage are
+# excluded: there a fixed click error is a large relative one.
+[calibration_bias]
+minimum_sinkage_m = 0.01
+by_plate = [
+  { contact_half_width_m = 0.03, relative_bias = -0.0031885974177674426 },
+  { contact_half_width_m = 0.035, relative_bias = 0.011448190285361266 },
+  { contact_half_width_m = 0.0375, relative_bias = -0.005466683761699297 },
+]
+
+# Envelope of each parameter when the measured biases above are
+# reassigned across plates, over all permutations. This is a bound
+# on the systematic reachable with these biases in their worst
+# arrangement, not a standard deviation. It is wide because the
+# plates carry very unequal leverage in the 1/b regression, so it
+# matters which plate a given bias lands on.
+
+[[calibration_bias_bound]]
+model = "bekker"
+weighting = "uniform"
+cohesive_modulus = { minimum = -49.896556723661256, maximum = -37.716681887891674 }
+frictional_modulus = { minimum = 3583.2756933295923, maximum = 3945.1585961637984 }
+sinkage_exponent = { minimum = 1.2843799280019923, maximum = 1.2843799280019945 }
+
+[[calibration_bias_bound]]
+model = "bekker"
+weighting = "pressure_squared"
+cohesive_modulus = { minimum = -56.6230332518815, maximum = -44.75383481837077 }
+frictional_modulus = { minimum = 3738.380620843303, maximum = 4096.015724995515 }
+sinkage_exponent = { minimum = 1.2751106626343118, maximum = 1.2763311320290545 }
+
+[[calibration_bias_bound]]
+model = "reece"
+weighting = "uniform"
+cohesive_modulus = { minimum = -31.22489043689771, maximum = -26.43357927916009 }
+frictional_modulus = { minimum = 1725.784051223215, maximum = 1868.4427064720012 }
+sinkage_exponent = { minimum = 1.2843799280019923, maximum = 1.2843799280019945 }
+
+[[calibration_bias_bound]]
+model = "reece"
+weighting = "pressure_squared"
+cohesive_modulus = { minimum = -33.51617561998824, maximum = -28.742070788313047 }
+frictional_modulus = { minimum = 1802.1959000731765, maximum = 1943.8470798969652 }
+sinkage_exponent = { minimum = 1.2751106626343118, maximum = 1.2763311320290545 }
+
 [[fit]]
 model = "bekker"
 weighting = "uniform"

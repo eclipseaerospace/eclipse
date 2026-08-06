@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# The published Bekker curve, traced from the same figures as the measurements.
+#
+# This is the fitted model as the authors drew it, not data. Fitting to it would
+# be circular, which is why kind is published_curve rather than
+# pressure_sinkage. Its purpose is to measure the per-figure axis-calibration
+# bias of the digitization: the trace should reproduce the transcribed Bekker
+# parameters, and whatever it misses by is calibration error.
+
+schema_version = 1
+id = "lim2021-published-bekker-curve"
+kind = "published_curve"
+
+[source]
+doi = "10.5140/JASS.2021.38.4.237"
+figure = "Figures 12, 13, 14"
+license = "CC-BY-NC-3.0"
+
+[digitization]
+tool = "WebPlotDigitizer (automeris.io)"
+method = "manual trace of the plotted Bekker curve, one figure per plate"
+operator = "b1aha"
+performed_on = 2026-08-05
+sinkage_uncertainty_m = 0.0005
+pressure_uncertainty_kPa = 0.6
+
+[digitization.axis_calibration]
+x = { minimum = 0.0, maximum = 0.1, units = "m", scale = "linear" }
+y = { minimum = 0.0, maximum = 160.0, units = "kPa", scale = "linear" }
+
+[series]
+path = "lim2021-published-bekker-curve.csv"
+sha256 = "32d70ec041da5a3ae04051ca6dc0d05069fe5093e38e1a62323b3dc3cf60604e"
+columns = ["contact_half_width_m", "test_id", "sinkage_m", "pressure_kPa"]

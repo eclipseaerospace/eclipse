@@ -77,7 +77,7 @@ def test_an_unsupported_schema_version_is_refused(
 
 def test_a_mismatched_kind_is_refused(digitized_series: Path) -> None:
     _corrupt(digitized_series, 'kind = "pressure_sinkage"', 'kind = "shear"')
-    with pytest.raises(SeriesFileError, match="expected 'pressure_sinkage'"):
+    with pytest.raises(SeriesFileError, match="this loader reads"):
         load_pressure_sinkage_series(digitized_series)
 
 
@@ -195,3 +195,22 @@ def test_observations_round_trip_through_the_csv(
     np.testing.assert_allclose(
         series.observations.pressure_kPa, recomputed, rtol=1e-15, atol=0.0
     )
+
+
+def test_a_published_curve_series_loads_under_its_own_kind(
+    digitized_series: Path,
+) -> None:
+    _corrupt(digitized_series, 'kind = "pressure_sinkage"', 'kind = "published_curve"')
+    series = load_pressure_sinkage_series(digitized_series)
+    assert series.kind == "published_curve", (
+        "the kind must survive loading so a traced model curve can never be "
+        "mistaken for measured data and fitted to"
+    )
+
+
+def test_an_unknown_kind_names_the_circularity_it_prevents(
+    digitized_series: Path,
+) -> None:
+    _corrupt(digitized_series, 'kind = "pressure_sinkage"', 'kind = "whatever"')
+    with pytest.raises(SeriesFileError, match="must never be fitted to"):
+        load_pressure_sinkage_series(digitized_series)

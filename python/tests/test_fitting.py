@@ -25,6 +25,7 @@ from biome.fitting import (
     fit_contact_model,
     fit_shared_power_law,
     mean_relative_residual,
+    parameter_bound_under_bias_permutation,
     relative_deviation,
 )
 from biome.io.soil import CalibratedContactModel
@@ -340,3 +341,85 @@ def test_no_fit_can_beat_the_determination_ceiling(
     assert coefficient_of_determination(fitted.model, scattered) <= (
         coefficient_of_determination_ceiling(scattered) + 1e-9
     )
+
+
+def test_above_sinkage_keeps_only_the_deeper_points(
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+) -> None:
+    exact = observations_from(published_models["bekker"], tested_half_widths)
+    threshold = float(np.median(exact.sinkage_m))
+    kept = exact.above_sinkage(threshold)
+    assert kept.count < exact.count
+    assert np.all(kept.sinkage_m >= threshold)
+
+
+def test_rescaling_by_plate_scales_only_pressure(
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+) -> None:
+    exact = observations_from(published_models["bekker"], tested_half_widths)
+    factors = {float(b): 1.0 + 0.1 * index for index, b in enumerate(tested_half_widths, 1)}
+    rescaled = exact.rescaled_by_plate(factors)
+    np.testing.assert_array_equal(rescaled.sinkage_m, exact.sinkage_m)
+    np.testing.assert_array_equal(
+        rescaled.contact_half_width_m, exact.contact_half_width_m
+    )
+    for half_width, factor in factors.items():
+        plate = exact.for_plate(half_width)
+        np.testing.assert_allclose(
+            rescaled.for_plate(half_width).pressure_kPa,
+            plate.pressure_kPa / factor,
+            rtol=1e-12,
+        )
+
+
+def test_rescaling_refuses_a_plate_it_has_no_factor_for(
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+) -> None:
+    exact = observations_from(published_models["bekker"], tested_half_widths)
+    with pytest.raises(ValueError, match="no rescaling factor for plates"):
+        exact.rescaled_by_plate({float(tested_half_widths[0]): 1.0})
+
+
+def test_a_zero_bias_permutation_bound_collapses_onto_the_fit(
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+) -> None:
+    exact = observations_from(published_models["bekker"], tested_half_widths)
+    bound = parameter_bound_under_bias_permutation("bekker", exact, [0.0, 0.0, 0.0])
+    fitted = fit_contact_model("bekker", exact)
+    for name, (low, high) in bound.items():
+        assert low == pytest.approx(high, rel=1e-12), f"{name} should not vary"
+        assert low == pytest.approx(fitted.parameters[name], rel=1e-9)
+
+
+def test_the_permutation_bound_brackets_the_measured_arrangement(
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+) -> None:
+    exact = observations_from(published_models["bekker"], tested_half_widths)
+    biases = [-0.003, 0.011, -0.005]
+    bound = parameter_bound_under_bias_permutation("bekker", exact, biases)
+    as_measured = fit_contact_model(
+        "bekker",
+        exact.rescaled_by_plate(
+            {float(b): 1.0 + bias for b, bias in zip(tested_half_widths, biases)}
+        ),
+    )
+    for name, (low, high) in bound.items():
+        assert low <= as_measured.parameters[name] <= high, (
+            f"{name} outside its own permutation bound"
+        )
+    low, high = bound["cohesive_modulus"]
+    assert high - low > 0.0, "unequal plate leverage must give a non-zero bound"
+
+
+def test_the_permutation_bound_needs_one_bias_per_plate(
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+) -> None:
+    exact = observations_from(published_models["bekker"], tested_half_widths)
+    with pytest.raises(ValueError, match="biases for .* plates"):
+        parameter_bound_under_bias_permutation("bekker", exact, [0.0, 0.0])

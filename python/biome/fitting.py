@@ -30,7 +30,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
+from itertools import permutations
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Final, Literal
@@ -53,6 +54,7 @@ __all__ = [
     "fit_contact_model",
     "fit_shared_power_law",
     "mean_relative_residual",
+    "parameter_bound_under_bias_permutation",
     "relative_deviation",
 ]
 
@@ -102,6 +104,36 @@ class PressureSinkageObservations:
     @property
     def contact_half_widths(self) -> NDArray[np.float64]:
         return np.unique(self.contact_half_width_m)
+
+    def above_sinkage(self, minimum_m: float) -> PressureSinkageObservations:
+        selected = self.sinkage_m >= minimum_m
+        return PressureSinkageObservations(
+            contact_half_width_m=self.contact_half_width_m[selected],
+            sinkage_m=self.sinkage_m[selected],
+            pressure_kPa=self.pressure_kPa[selected],
+        )
+
+    def rescaled_by_plate(
+        self, factors: Mapping[float, float]
+    ) -> PressureSinkageObservations:
+        missing = sorted(
+            float(half_width)
+            for half_width in self.contact_half_widths
+            if float(half_width) not in factors
+        )
+        if missing:
+            raise ValueError(
+                f"no rescaling factor for plates {missing}; every plate present "
+                "in the observations needs one"
+            )
+        scale = np.array(
+            [factors[float(half_width)] for half_width in self.contact_half_width_m]
+        )
+        return PressureSinkageObservations(
+            contact_half_width_m=self.contact_half_width_m,
+            sinkage_m=self.sinkage_m,
+            pressure_kPa=self.pressure_kPa / scale,
+        )
 
     def for_plate(self, contact_half_width: float) -> PressureSinkageObservations:
         selected = self.contact_half_width_m == contact_half_width
@@ -251,6 +283,35 @@ def fit_contact_model(
         weighting=weighting,
         observation_count=observations.count,
         plate_count=plate_count,
+    )
+
+
+def parameter_bound_under_bias_permutation(
+    model_id: str,
+    observations: PressureSinkageObservations,
+    biases: Sequence[float],
+    *,
+    weighting: WeightingScheme = DEFAULT_WEIGHTING,
+) -> Mapping[str, tuple[float, float]]:
+    plates = [float(half_width) for half_width in observations.contact_half_widths]
+    if len(biases) != len(plates):
+        raise ValueError(
+            f"{len(biases)} biases for {len(plates)} plates; the permutation "
+            "reassigns one measured bias per plate"
+        )
+    extremes: dict[str, list[float]] = {}
+    for order in permutations(biases):
+        parameters = fit_contact_model(
+            model_id,
+            observations.rescaled_by_plate(
+                {plate: 1.0 + bias for plate, bias in zip(plates, order, strict=True)}
+            ),
+            weighting=weighting,
+        ).parameters
+        for name, value in parameters.items():
+            extremes.setdefault(name, []).append(value)
+    return MappingProxyType(
+        {name: (min(values), max(values)) for name, values in extremes.items()}
     )
 
 

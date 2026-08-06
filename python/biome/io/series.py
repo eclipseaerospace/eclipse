@@ -33,6 +33,7 @@ from biome.fitting import PressureSinkageObservations
 __all__ = [
     "AxisCalibration",
     "Digitization",
+    "PUBLISHED_CURVE_KIND",
     "PressureSinkageSeries",
     "SeriesFileError",
     "Source",
@@ -41,6 +42,8 @@ __all__ = [
 
 SUPPORTED_SCHEMA_VERSIONS: Final = frozenset({1})
 PRESSURE_SINKAGE_KIND: Final = "pressure_sinkage"
+PUBLISHED_CURVE_KIND: Final = "published_curve"
+SUPPORTED_KINDS: Final = frozenset({PRESSURE_SINKAGE_KIND, PUBLISHED_CURVE_KIND})
 REQUIRED_COLUMNS: Final = (
     "contact_half_width_m",
     "test_id",
@@ -204,9 +207,11 @@ def load_pressure_sinkage_series(manifest_path: Path | str) -> PressureSinkageSe
             f"this loader reads {sorted(SUPPORTED_SCHEMA_VERSIONS)}"
         )
     kind = manifest.get("kind")
-    if kind != PRESSURE_SINKAGE_KIND:
+    if kind not in SUPPORTED_KINDS:
         raise SeriesFileError(
-            f"{manifest_path}: kind is {kind!r}, expected {PRESSURE_SINKAGE_KIND!r}"
+            f"{manifest_path}: kind is {kind!r}, this loader reads "
+            f"{sorted(SUPPORTED_KINDS)}. A published_curve series traces a fitted "
+            "model and must never be fitted to, only compared against"
         )
 
     context = f"{manifest_path} series {manifest.get('id', '<unnamed>')}"

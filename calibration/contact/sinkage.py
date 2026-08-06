@@ -44,6 +44,7 @@ from matplotlib.patches import Patch
 
 from biome.fitting import (
     DEFAULT_WEIGHTING,
+    parameter_bound_under_bias_permutation,
     coefficient_of_determination_ceiling,
     FittedContactModel,
     WeightingScheme,
@@ -64,6 +65,10 @@ DEFAULT_SOIL_PATH: Final = REPOSITORY_ROOT / "data" / "soils" / "kls1.toml"
 DEFAULT_SERIES_PATH: Final = (
     REPOSITORY_ROOT / "data" / "literature" / "lim2021-pressure-sinkage.toml"
 )
+DEFAULT_TRACE_PATH: Final = (
+    REPOSITORY_ROOT / "data" / "literature" / "lim2021-published-bekker-curve.toml"
+)
+CALIBRATION_BIAS_MINIMUM_SINKAGE_M: Final = 0.010
 DEFAULT_FIGURE_PATH: Final = (
     Path(__file__).resolve().parent / "figures" / "kls1-pressure-sinkage.png"
 )
@@ -351,6 +356,7 @@ def build_report(
     soil_path: Path,
     series: PressureSinkageSeries | None,
     fits: dict[tuple[str, str], FittedContactModel],
+    bias: dict[float, float],
 ) -> str:
     depth = _sinkage_sweep(models[REFERENCE_MODEL])
     lines = [
@@ -444,6 +450,55 @@ def build_report(
             )
             lines.append(f"{model_id} = [{rows}]")
 
+    if bias and series is not None:
+        lines.extend([
+            "",
+            "# Per-figure axis-calibration bias, measured by tracing the published",
+            "# Bekker curve on each source figure and comparing against the",
+            "# transcribed parameters. Points below the minimum sinkage are",
+            "# excluded: there a fixed click error is a large relative one.",
+            "[calibration_bias]",
+            f"minimum_sinkage_m = {_format_float(CALIBRATION_BIAS_MINIMUM_SINKAGE_M)}",
+            "by_plate = ["
+        ])
+        for half_width in half_widths:
+            if half_width in bias:
+                lines.append(
+                    f"  {{ contact_half_width_m = {_format_float(half_width)}, "
+                    f"relative_bias = {_format_float(bias[half_width])} }},"
+                )
+        lines.append("]")
+
+        observed = [float(b) for b in series.observations.contact_half_widths]
+        if sorted(bias) == sorted(observed):
+            lines.extend([
+                "",
+                "# Envelope of each parameter when the measured biases above are",
+                "# reassigned across plates, over all permutations. This is a bound",
+                "# on the systematic reachable with these biases in their worst",
+                "# arrangement, not a standard deviation. It is wide because the",
+                "# plates carry very unequal leverage in the 1/b regression, so it",
+                "# matters which plate a given bias lands on.",
+            ])
+            for model_id in models:
+                for scheme in WEIGHTINGS:
+                    bound = parameter_bound_under_bias_permutation(
+                        model_id, series.observations,
+                        [bias[plate] for plate in observed],
+                        weighting=scheme,
+                    )
+                    lines.extend([
+                        "",
+                        "[[calibration_bias_bound]]",
+                        f'model = "{model_id}"',
+                        f'weighting = "{scheme}"',
+                        *(
+                            f"{name} = {{ minimum = {_format_float(low)}, "
+                            f"maximum = {_format_float(high)} }}"
+                            for name, (low, high) in bound.items()
+                        ),
+                    ])
+
     if series is None:
         return "\n".join(lines) + "\n"
 
@@ -500,6 +555,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--soil", type=Path, default=DEFAULT_SOIL_PATH)
     parser.add_argument("--series", type=Path, default=DEFAULT_SERIES_PATH)
+    parser.add_argument("--trace", type=Path, default=DEFAULT_TRACE_PATH)
     parser.add_argument("--figure", type=Path, default=DEFAULT_FIGURE_PATH)
     parser.add_argument("--report", type=Path, default=DEFAULT_REPORT_PATH)
     arguments = parser.parse_args(argv)
@@ -553,6 +609,28 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
 
+    bias: dict[float, float] = {}
+    if arguments.trace.is_file():
+        try:
+            trace = load_pressure_sinkage_series(arguments.trace)
+        except SeriesFileError as error:
+            print(f"cannot read the published-curve trace: {error}", file=sys.stderr)
+            return 1
+        usable = trace.observations.above_sinkage(CALIBRATION_BIAS_MINIMUM_SINKAGE_M)
+        bias = {
+            float(half_width): mean_relative_residual(
+                models[REFERENCE_MODEL].extrapolating,
+                usable.for_plate(float(half_width)),
+            )
+            for half_width in usable.contact_half_widths
+        }
+    else:
+        print(
+            f"no published-curve trace at {arguments.trace}; the calibration bias "
+            "of the digitization cannot be measured",
+            file=sys.stderr,
+        )
+
     figure = build_figure(models, half_widths, series, arguments.report)
     arguments.figure.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(arguments.figure)
@@ -560,7 +638,9 @@ def main(argv: list[str] | None = None) -> int:
 
     arguments.report.parent.mkdir(parents=True, exist_ok=True)
     arguments.report.write_text(
-        build_report(soil, dataset, models, half_widths, arguments.soil, series, fits),
+        build_report(
+            soil, dataset, models, half_widths, arguments.soil, series, fits, bias
+        ),
         encoding="utf-8",
     )
 
