@@ -153,9 +153,12 @@ cases = [
 # plate_scaling_slope * b + plate_scaling_intercept is negative across the
 # whole tested range of half-widths, crossing zero at b = 0.0754 m, so these
 # parameters do not reproduce sensible pressures under the stated equations.
-# That crossing sits within 0.05 percent of the largest plate diameter,
-# 0.075 m; whether the model was fitted against diameter rather than radius is
-# a question for the paper, not an assumption to encode. Do not guess at a fix.
+#
+# The length-convention explanation was tested and does not hold. That crossing
+# sits within 0.05 percent of the largest plate diameter, but reading b as the
+# diameter leaves the scaling negative on every plate anyway, at -35.7, -12.5
+# and -0.9. The irreproducibility is in the equation form, not in whether b is
+# a radius or a diameter. Do not guess at a fix.
 
 [[dataset.model]]
 id         = "dimensional_analysis_lim2021"

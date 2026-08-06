@@ -20,7 +20,7 @@ numpy = "2.5.1"
 
 [inputs]
 soil = "data/soils/kls1.toml"
-soil_sha256 = "0e5200842e2f6ca594feda10b70aaa393e8cf9d31c6c37ecfdb566da2623e9f0"
+soil_sha256 = "20833091197cd5c32c09b170210408ac2868792190ac29ac64708a280b972549"
 soil_id = "kls1"
 dataset_id = "lim2021"
 doi = "10.5140/JASS.2021.38.4.237"
