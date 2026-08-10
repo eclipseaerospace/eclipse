@@ -13,14 +13,17 @@
 # re-running against unchanged inputs must leave it byte-identical, so any diff
 # means a result actually moved.
 #
-# The legend carries linestyle only. Colour identifies the plate and is read off
-# the direct labels at the curve ends, because every plate draws both a solid and
-# a dashed curve and a single coloured swatch would misdescribe them.
+# Axes follow the bevameter convention used throughout the terramechanics
+# literature: pressure across, sinkage increasing down the page, so a curve falls
+# the way the plate it describes sinks.
 #
-# Colours are the first three slots of a categorical palette validated for
-# colour-vision deficiency at all pairs (worst CVD dE 9.2, normal-vision 24.0).
-# Curves carry direct labels because one slot sits below 3:1 contrast on the
-# figure surface, so identity may not rest on colour alone.
+# Plate identity carries on line style and marker shape, model identity on
+# color. That assignment is the way round it is because the two model curves sit
+# nearly on top of each other while the three plate curves are well separated: a
+# dash pattern cannot separate coincident strokes, and a hue can.
+#
+# No shaded bands. The replicate scatter is the marker cloud itself, and drawing
+# an envelope over it asserts a distribution the digitization does not support.
 
 from __future__ import annotations
 
@@ -39,8 +42,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+from matplotlib.legend_handler import HandlerTuple
 from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
 
 from biome.fitting import (
     DEFAULT_WEIGHTING,
@@ -78,19 +81,30 @@ DEFAULT_REPORT_PATH: Final = (
 
 REFERENCE_MODEL: Final = "bekker"
 COMPARED_MODEL: Final = "reece"
-MODEL_LINESTYLES: Final[dict[str, Any]] = {
-    REFERENCE_MODEL: "solid",
-    COMPARED_MODEL: (0, (5, 2)),
+MODEL_COLORS: Final[dict[str, str]] = {
+    REFERENCE_MODEL: "#1f4e9c",
+    COMPARED_MODEL: "#d4570a",
+}
+# The two fits differ by a few percent, so their curves very nearly coincide.
+# Drawing the compared model thinner and on top leaves the reference visible as a
+# wider stroke underneath rather than hidden by whichever was drawn last.
+MODEL_LINEWIDTHS: Final[dict[str, float]] = {
+    REFERENCE_MODEL: 2.6,
+    COMPARED_MODEL: 1.0,
 }
 
-PLATE_COLOURS: Final = ("#2a78d6", "#eb6834", "#1baf7a")
+PLATE_LINESTYLES: Final[tuple[Any, ...]] = (
+    "solid",
+    (0, (6, 2)),
+    (0, (7, 2, 1.5, 2)),
+)
+PLATE_MARKERS: Final = ("o", "^", "s")
 INK_PRIMARY: Final = "#0b0b0b"
 INK_SECONDARY: Final = "#52514e"
 INK_MUTED: Final = "#8a8880"
 SURFACE: Final = "#fcfcfb"
 CURVE_SAMPLES: Final = 400
-BAND_COLUMN_TOLERANCE_MM: Final = 2.0
-BAND_FILL_ALPHA: Final = 0.12
+MARKER_SIZE: Final = 3.4
 PLATE_LEGEND_ANCHOR: Final = 0.755
 WEIGHTINGS: Final[tuple[WeightingScheme, ...]] = ("uniform", "pressure_squared")
 REPORT_SCHEMA_VERSION: Final = 1
@@ -121,14 +135,15 @@ FIGURE_STYLE: Final[dict[str, Any]] = {
 }
 
 
-def _plate_colour(index: int) -> str:
-    if index >= len(PLATE_COLOURS):
+def _plate_style(index: int) -> tuple[Any, str]:
+    if index >= len(PLATE_LINESTYLES):
         raise SystemExit(
-            f"the validated palette carries {len(PLATE_COLOURS)} categorical "
-            f"slots but this dataset has {index + 1} plates; fold the extra "
-            "plates into small multiples rather than inventing a hue"
+            f"the figure carries {len(PLATE_LINESTYLES)} distinguishable plate "
+            f"styles but this dataset has {index + 1} plates; fold the extra "
+            "plates into small multiples rather than inventing a dash pattern "
+            "no reader can name"
         )
-    return PLATE_COLOURS[index]
+    return PLATE_LINESTYLES[index], PLATE_MARKERS[index]
 
 
 def _digest(path: Path) -> str:
@@ -156,42 +171,6 @@ def _plate_observation_count(
     )
 
 
-def _band(
-    series: PressureSinkageSeries, half_width: float
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    selected = series.observations.for_plate(half_width)
-    order = np.argsort(selected.sinkage_m)
-    sinkage = selected.sinkage_m[order] * 1e3
-    pressure = selected.pressure_kPa[order]
-    centres, lower, upper = [], [], []
-    start = 0
-    for index in range(1, sinkage.size + 1):
-        if index == sinkage.size or sinkage[index] - sinkage[start] > BAND_COLUMN_TOLERANCE_MM:
-            centres.append(sinkage[start:index].mean())
-            lower.append(pressure[start:index].min())
-            upper.append(pressure[start:index].max())
-            start = index
-    return np.array(centres), np.array(lower), np.array(upper)
-
-
-def _draw_bands(
-    axes: Axes, series: PressureSinkageSeries, half_widths: list[float]
-) -> None:
-    for index, half_width in enumerate(half_widths):
-        if _plate_observation_count(series, half_width) < 2:
-            continue
-        centres, lower, upper = _band(series, half_width)
-        if not centres.size:
-            continue
-        colour = _plate_colour(index)
-        axes.fill_between(
-            centres, lower, upper, color=colour, alpha=BAND_FILL_ALPHA,
-            linewidth=0.0, zorder=2,
-        )
-        for edge in (lower, upper):
-            axes.plot(centres, edge, color=colour, linewidth=0.6, alpha=0.6, zorder=3)
-
-
 def _draw_observations(
     axes: Axes, series: PressureSinkageSeries, half_widths: list[float]
 ) -> None:
@@ -200,13 +179,13 @@ def _draw_observations(
             continue
         selected = series.observations.for_plate(half_width)
         axes.plot(
-            selected.sinkage_m * 1e3,
             selected.pressure_kPa,
-            marker="o",
-            markersize=3.4,
-            markerfacecolor=SURFACE,
-            markeredgecolor=_plate_colour(index),
-            markeredgewidth=0.9,
+            selected.sinkage_m * 1e3,
+            marker=_plate_style(index)[1],
+            markersize=MARKER_SIZE,
+            markerfacecolor="none",
+            markeredgecolor=INK_SECONDARY,
+            markeredgewidth=0.8,
             linestyle="none",
             zorder=5,
         )
@@ -219,39 +198,45 @@ def _draw_curves(
     depth: np.ndarray,
 ) -> None:
     for index, half_width in enumerate(half_widths):
-        for model_id, model in models.items():
+        linestyle, _ = _plate_style(index)
+        for order, model_id in enumerate((REFERENCE_MODEL, COMPARED_MODEL)):
+            model = models.get(model_id)
+            if model is None:
+                continue
             axes.plot(
-                depth * 1e3,
                 model.pressure(sinkage=depth, contact_half_width=half_width),
-                color=_plate_colour(index), linewidth=1.5,
-                linestyle=MODEL_LINESTYLES[model_id], zorder=4,
+                depth * 1e3,
+                color=MODEL_COLORS[model_id],
+                linewidth=MODEL_LINEWIDTHS[model_id],
+                linestyle=linestyle, zorder=4 + order,
             )
 
-    axes.set_ylim(bottom=0.0)
+    axes.set_xlim(left=0.0)
 
 
-def _legend_handles(has_series: bool) -> list[Any]:
+def _legend_entries(has_series: bool) -> tuple[list[Any], list[str]]:
+    models = (REFERENCE_MODEL, COMPARED_MODEL)
     handles: list[Any] = [
         Line2D(
-            [], [], color=INK_SECONDARY, linewidth=1.5,
-            linestyle=MODEL_LINESTYLES[model_id],
-            label=f"{model_id.title()} (published)",
+            [], [], color=MODEL_COLORS[model_id],
+            linewidth=MODEL_LINEWIDTHS[model_id],
         )
-        for model_id in (REFERENCE_MODEL, COMPARED_MODEL)
+        for model_id in models
     ]
+    labels = [f"{model_id.title()} (published)" for model_id in models]
     if has_series:
         handles.append(
-            Line2D(
-                [], [], color=INK_SECONDARY, marker="o", markersize=3.4,
-                markerfacecolor=SURFACE, markeredgewidth=0.9, linestyle="none",
-                label="digitized points",
+            tuple(
+                Line2D(
+                    [], [], color=INK_SECONDARY, marker=marker,
+                    markersize=MARKER_SIZE, markerfacecolor="none",
+                    markeredgewidth=0.8, linestyle="none",
+                )
+                for marker in PLATE_MARKERS
             )
         )
-        handles.append(
-            Patch(facecolor=INK_SECONDARY, alpha=BAND_FILL_ALPHA,
-                  label="replicate spread")
-        )
-    return handles
+        labels.append("digitized points")
+    return handles, labels
 
 
 def _plate_legend_handles(
@@ -261,13 +246,20 @@ def _plate_legend_handles(
 ) -> list[Any]:
     handles: list[Any] = []
     for index, half_width in enumerate(half_widths):
+        linestyle, marker = _plate_style(index)
         label = f"b = {half_width * 1e3:.1f} mm"
         if series is not None and _plate_observation_count(series, half_width) >= 2:
             residual = mean_relative_residual(
                 published.extrapolating, series.observations.for_plate(half_width)
             )
-            label += f"    band {residual * 100:+.1f}%"
-        handles.append(Patch(facecolor=_plate_colour(index), label=label))
+            label += f"    residual {residual * 100:+.1f}%"
+        handles.append(
+            Line2D(
+                [], [], color=INK_SECONDARY, linewidth=1.4, linestyle=linestyle,
+                marker=marker, markersize=MARKER_SIZE, markerfacecolor="none",
+                markeredgewidth=0.8, label=label,
+            )
+        )
     return handles
 
 
@@ -282,21 +274,22 @@ def build_figure(
     with plt.rc_context(cast(Any, FIGURE_STYLE)):
         figure, axes = plt.subplots()
         if series is not None:
-            _draw_bands(axes, series, half_widths)
             _draw_observations(axes, series, half_widths)
         _draw_curves(axes, models, half_widths, depth)
 
-        axes.set_xlabel("sinkage  (mm)")
-        axes.set_ylabel("pressure  (kPa)")
-        axes.set_xlim(0.0, published.sinkage_validity.max * 1e3 * 1.02)
+        axes.set_xlabel("pressure  (kPa)")
+        axes.set_ylabel("sinkage  (mm)")
+        axes.set_ylim(published.sinkage_validity.max * 1e3 * 1.02, 0.0)
+        handles, labels = _legend_entries(series is not None)
         style_legend = axes.legend(
-            handles=_legend_handles(series is not None), loc="upper left"
+            handles=handles, labels=labels, loc="upper right",
+            handler_map={tuple: HandlerTuple(ndivide=None, pad=0.7)},
         )
         axes.add_artist(style_legend)
         axes.legend(
             handles=_plate_legend_handles(half_widths, published, series),
-            loc="upper left",
-            bbox_to_anchor=(0.0, PLATE_LEGEND_ANCHOR),
+            loc="upper right",
+            bbox_to_anchor=(1.0, PLATE_LEGEND_ANCHOR),
         )
         axes.spines["top"].set_visible(False)
         axes.spines["right"].set_visible(False)
@@ -308,8 +301,8 @@ def build_figure(
             if series is None
             else (
                 f"{series.observations.count} points digitized from "
-                f"{series.source.figure} of {series.source.doi}.\nShaded bands span "
-                "the replicate scatter at each sampled sinkage."
+                f"{series.source.figure} of {series.source.doi}.\nMarker shape and "
+                "dash pattern identify the plate; color identifies the model."
             )
         )
         figure.text(
