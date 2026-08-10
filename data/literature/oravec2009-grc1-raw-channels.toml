@@ -1,0 +1,173 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# GRC-1 plate-sinkage raw sensor channels, transcribed from published source.
+#
+# These are not pressures and sinkages. They are the displacement and load
+# readings the acquisition system recorded, carried across exactly as Appendix D
+# prints them, digit for digit. The conversion to engineering units is recorded
+# under [conversion] and implemented in tested code, never applied here.
+#
+# Three anomalies in the source are recorded under [[anomaly]]. None of them
+# touches these channels, which are the raw record; all three affect summary
+# values derived from it, and one was propagated by a citing paper.
+
+schema_version = 1
+id             = "oravec2009-grc1-raw-channels"
+kind           = "raw_bevameter_channels"
+
+[source]
+author      = "Oravec HA"
+title       = "Understanding Mechanical Behavior of Lunar Soils for the Study of Vehicle Mobility"
+kind        = "phd_dissertation"
+institution = "Case Western Reserve University"
+department  = "Department of Civil Engineering"
+adviser     = "Zeng X"
+year        = 2009
+listing     = "Appendix D, Code D5"
+figures     = ["Figure 5.52", "Figure 5.53"]
+accessed    = 2026-08-10
+
+[material]
+name         = "Glenn Research Center simulant 1"
+short_name   = "GRC-1"
+kind         = "simulant"
+analogue_for = "lunar_regolith"
+fidelity     = "non_mineralogical"
+producer     = "NASA Glenn Research Center"
+
+[conditions]
+gravity              = { value = 9.81, units = "m/s^2" }
+atmosphere           = "ambient"
+temperature          = "ambient"
+bed_density          = { value = 1670, units = "kg/m^3" }
+bed_relative_density = { value = 24,   units = "percent" }
+bed_depth            = { value = 0.24, units = "m" }
+
+[apparatus]
+method             = "bevameter_plate_sinkage"
+plate_geometry     = "circular_rigid_flat"
+plate_length_scale = "radius"
+bin_shape          = "square"
+bin_width          = { value = 0.742, units = "m" }
+bin_height         = { value = 0.50,  units = "m" }
+bin_material       = "rigid_polypropylene"
+repeats_per_plate  = 5
+n_tests            = 15
+
+plates = [
+  { diameter_m = 0.076, contact_half_width_m = 0.038, area_m2 = 4.5364598e-3 },
+  { diameter_m = 0.102, contact_half_width_m = 0.051, area_m2 = 8.1712825e-3 },
+  { diameter_m = 0.190, contact_half_width_m = 0.095, area_m2 = 2.8352874e-2 },
+]
+
+# Table 5.1, February 2008 column, which is the pairing Code D5 uses. The
+# September 2007 column reads 1170.2 and 1126.3 and belongs to earlier
+# campaigns. Units are as printed: the displacement constant is annotated
+# "mm*V" here and "mm/V" in the code of an earlier listing, while the
+# arithmetic in every listing treats it as millimetres per volt per volt.
+[calibration]
+source       = "Table 5.1, February 2008"
+load_cell    = { value = 1155.1, units = "N/(mV/V)" }
+displacement = { value = 1139.8, units = "mm*V" }
+
+# Recorded, not applied. Excitation voltage is measured per test and appears in
+# the series as its own column; it must be used as recorded rather than assumed
+# to be the nominal ten volts.
+[conversion]
+zeroing = "subtract the first sample of each channel, per test"
+sinkage_m = "lvdt_mV * 1e-3 / excitation_V * displacement / 1000"
+load_kN = "load_cell_mV_per_V * load_cell / 1000"
+pressure_kPa = "load_kN / (pi * contact_half_width_m ^ 2)"
+
+# Fitting the reconstruction by the procedure in Code D5 must return these.
+# Both entries come from the same channels and differ only in the pressure
+# range resampled onto, which is why they are recorded together: the pair is a
+# far stronger check on the reconstruction than either alone.
+#
+# The estimator is Wong's, as coded: a sinkage exponent fitted per plate under
+# pressure-squared weighting and then averaged, an equivalent modulus per plate
+# at that averaged exponent, and an unweighted least-squares line through the
+# three moduli against reciprocal half-width.
+
+[[verification]]
+id                       = "figure-5.52"
+window                   = "lunar_pressure_range"
+resampling_endpoints_kPa = [50.0, 50.0, 30.0]
+resampling_endpoints     = "published"
+resampling_step_kPa      = 0.5
+leading_samples_dropped  = [3, 1, 1]
+sinkage_exponent         = 1.232
+cohesive_modulus         = 4096.3537
+frictional_modulus       = -22284.5786
+goodness_of_fit          = [0.069, 0.143, 0.249]
+maximum_deviation_mm     = [0.5, 0.4, 0.8]
+
+[[verification]]
+id                       = "figure-5.53"
+window                   = "entire_pressure_range"
+resampling_endpoints_kPa = [160.0, 105.0, 30.0]
+resampling_endpoints     = "recovered"
+resampling_step_kPa      = 0.5
+leading_samples_dropped  = [1, 1, 1]
+sinkage_exponent         = 0.80563
+cohesive_modulus         = 97.06
+frictional_modulus       = 1744.2495
+goodness_of_fit          = [nan, nan, nan]
+maximum_deviation_mm     = [nan, nan, nan]
+
+[verification.metric]
+goodness_of_fit = "sqrt(sum((pressure - predicted)^2) / (count - 2)) / mean(pressure)"
+goodness_of_fit_optimum = 0.0
+
+# The endpoints for figure-5.53 are not stated anywhere in the source. They were
+# recovered by searching the resampling grid for the triple that reproduces the
+# published parameters, which alone would be fitting a free parameter. What makes
+# them safe to record is the corroboration that followed and was not optimised
+# for: 160 kPa is exactly the horizontal axis limit of Figure 5.53, and 105 and
+# 30 kPa sit at the range each of the other two plates actually reached.
+[[note]]
+id      = "recovered-resampling-endpoints"
+applies = "figure-5.53"
+detail  = "endpoints recovered by search, then corroborated by the published axis limit"
+
+[[anomaly]]
+id     = "table-5.4-third-row-moduli"
+status = "confirmed"
+detail = """
+Table 5.4 gives the 1.75 g/cc row as n 1.11, cohesive 97.06, frictional 1744.15.
+Figure 5.59, which is that fit, gives 1.1107, 1581.1504 and -5139.1398. The
+moduli in the table are instead those of Figure 5.53, a different analysis of a
+different density over a different pressure range. The exponent is from one fit
+and the moduli from another. The figure labels carry full precision and are
+self-consistent, so they are the reference and the table is not.
+"""
+
+[[anomaly]]
+id     = "lim2021-table-4-transposition"
+status = "confirmed"
+detail = """
+Lim et al. (2021) Table 4 quotes the GRC-1 frictional modulus lower bound as
+-1,119.12. This source states -1199.12 in three independent places: the Figure
+5.58 label at full precision as -1199.1232, the Table 5.4 cell, and the prose.
+The digits are transposed in the citing paper. Table 4 also inherits the
+anomaly above, so its GRC-1 row is wrong in both moduli from two stacked
+causes: read against the figure labels the ranges are 221.26 to 1581.15 and
+-5139.14 to 1957.51, not 97.06 to 649.64 and -1,119.12 to 1,957.51.
+"""
+
+[[anomaly]]
+id     = "entire-range-deviation-mismatch"
+status = "unexplained"
+detail = """
+The prose quotes maximum standard deviations of 12, 1.6 and 1.7 mm for the
+entire pressure range. Reconstruction at the endpoints that reproduce all three
+published parameters to five figures gives 17.7, 0.43 and 0.82 mm. The lunar
+range reconciles exactly, deviations included, so the method is not in doubt.
+Either the prose describes a different quantity, or these summary values are
+affected as the two anomalies above are. Recorded rather than resolved.
+"""
+
+[series]
+path    = "oravec2009-grc1-raw-channels.csv"
+sha256  = "953c174a96394a5bcd5acfb47da3e40b6f8a77e196b9f7fabffdb809f4b7a484"
+columns = ["plate_diameter_m", "test_id", "excitation_V", "lvdt_mV", "load_cell_mV_per_V"]
