@@ -207,7 +207,7 @@ def test_extrapolating_bypasses_the_validity_range(
     assert math.isfinite(float(extrapolated))
 
 
-def test_extrapolating_still_honours_the_physics_guards(
+def test_extrapolating_still_honors_the_physics_guards(
     reference_model: CalibratedContactModel,
 ) -> None:
     floor = reference_model.minimum_invertible_half_width()

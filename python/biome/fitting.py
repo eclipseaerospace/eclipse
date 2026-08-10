@@ -20,14 +20,14 @@
 #      intercept k_c and slope k_phi.
 #
 # Weighting is explicit because it changes the answer. Unweighted least squares
-# in log space minimises relative rather than absolute error and biases the fit
+# in log space minimizes relative rather than absolute error and biases the fit
 # toward small pressures; weighting each log residual by the squared pressure
 # restores the linear-space criterion to first order. Published fits rarely
 # state which they used, so the scheme is selectable, and recovering published
 # parameters is how you find out which one was used.
 #
 # profile_cohesive_modulus fixes the cohesive modulus across a range and
-# re-optimises everything else, the sinkage exponent included. Holding the
+# re-optimizes everything else, the sinkage exponent included. Holding the
 # exponent at its joint value would profile a two-parameter model instead, and
 # report a narrower interval than the three-parameter model supports.
 #
@@ -356,8 +356,8 @@ def _golden_section_minimum(
             at_right = objective(right)
         if upper - lower < 1e-12 * max(1.0, abs(lower) + abs(upper)):
             break
-    centre = 0.5 * (lower + upper)
-    return centre, objective(centre)
+    center = 0.5 * (lower + upper)
+    return center, objective(center)
 
 
 def _minimum_above(

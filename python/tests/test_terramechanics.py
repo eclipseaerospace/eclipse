@@ -6,7 +6,7 @@
 # here, so adding a soil adds its own tests and a transcription change fails
 # loudly. Anything asserted about a specific number lives in the data.
 #
-# Model-behaviour tests parametrise over CONTACT_MODELS rather than naming
+# Model-behavior tests parametrize over CONTACT_MODELS rather than naming
 # classes, so registering a model covers it automatically. They rely on every
 # registered model sharing one constructor signature, which is itself asserted
 # by test_registered_models_share_one_parameter_signature.
@@ -149,7 +149,7 @@ def test_registered_models_share_one_parameter_signature() -> None:
         for model_id, factory in CONTACT_MODELS.items()
     }
     assert set(signatures.values()) == {SHARED_PARAMETER_NAMES}, (
-        "model-behaviour tests construct every registered model with "
+        "model-behavior tests construct every registered model with "
         f"{SHARED_PARAMETER_NAMES}; signatures found were {signatures}"
     )
 

@@ -4,7 +4,7 @@
 #
 # Observations are generated from the published models rather than read from a
 # committed file. A fabricated measurement file in a repository whose value is
-# its provenance is a liability, however clearly it is labelled; generating
+# its provenance is a liability, however clearly it is labeled; generating
 # points inside a fixture keeps them off disk and out of every commit.
 #
 # Generating from the published model is also the stronger test: a fit given

@@ -5,13 +5,13 @@
 # Pure and array-first: no I/O, no unit conversion, no parameter loading.
 # Both models are monotone power laws in sinkage whose deformation modulus
 # depends on the contact half-width. They differ in that dependence, and in
-# whether sinkage is normalised by the half-width.
+# whether sinkage is normalized by the half-width.
 #
 # Finite input yields finite output, or raises. Values outside a model's fitted
 # validity range are the loader's concern, not this layer's.
 #
 # Units are those of the fitted parameters and are never converted here. With
-# parameters as published for KLS-1, sinkage in metres yields pressure in kPa.
+# parameters as published for KLS-1, sinkage in meters yields pressure in kPa.
 #
 # References
 #   Bekker MG (1956) Theory of Land Locomotion. University of Michigan Press.

@@ -473,12 +473,12 @@ def test_the_profile_minimum_is_the_direct_fit(
 ) -> None:
     exact = observations_from(published_models["bekker"], tested_half_widths)
     direct = fit_contact_model("bekker", exact, weighting="uniform", estimator="direct")
-    centre = direct.parameters["cohesive_modulus"]
+    center = direct.parameters["cohesive_modulus"]
     profile = profile_cohesive_modulus(
-        "bekker", exact, np.linspace(centre - 20.0, centre + 20.0, 201),
+        "bekker", exact, np.linspace(center - 20.0, center + 20.0, 201),
         weighting="uniform",
     )
-    assert profile.minimum_value == pytest.approx(centre, abs=0.3), (
+    assert profile.minimum_value == pytest.approx(center, abs=0.3), (
         "the profile is the direct fit with one parameter held, so its minimum "
         "must be the direct fit"
     )
@@ -491,14 +491,14 @@ def test_a_profile_of_noiseless_data_is_sharp(
     tested_half_widths: np.ndarray,
 ) -> None:
     exact = observations_from(published_models["bekker"], tested_half_widths)
-    centre = published_models["bekker"].parameters["cohesive_modulus"]
+    center = published_models["bekker"].parameters["cohesive_modulus"]
     profile = profile_cohesive_modulus(
-        "bekker", exact, np.linspace(centre - 15.0, centre + 15.0, 601),
+        "bekker", exact, np.linspace(center - 15.0, center + 15.0, 601),
         weighting="uniform",
     )
     low, high = profile.confidence_interval()
-    assert low <= centre <= high
-    assert (high - low) / abs(centre) < 0.01, (
+    assert low <= center <= high
+    assert (high - low) / abs(center) < 0.01, (
         "data lying exactly on the model must determine the parameter sharply"
     )
 
@@ -516,9 +516,9 @@ def test_a_profile_narrower_than_its_own_interval_is_refused(
         * (1.0 + generator.normal(0.0, 0.10, exact.count)),
     )
     direct = fit_contact_model("bekker", noisy, weighting="uniform", estimator="direct")
-    centre = direct.parameters["cohesive_modulus"]
+    center = direct.parameters["cohesive_modulus"]
     profile = profile_cohesive_modulus(
-        "bekker", noisy, np.linspace(centre - 0.5, centre + 0.5, 21),
+        "bekker", noisy, np.linspace(center - 0.5, center + 0.5, 21),
         weighting="uniform",
     )
     with pytest.raises(ValueError, match="reaches the edge of the profiled range"):
