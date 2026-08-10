@@ -171,3 +171,93 @@ affected as the two anomalies above are. Recorded rather than resolved.
 path    = "oravec2009-grc1-raw-channels.csv"
 sha256  = "953c174a96394a5bcd5acfb47da3e40b6f8a77e196b9f7fabffdb809f4b7a484"
 columns = ["plate_diameter_m", "test_id", "excitation_V", "lvdt_mV", "load_cell_mV_per_V"]
+
+[[conversion_check]]
+test_id              = "small-1"
+sample_count         = 27
+maximum_sinkage_m    = 0.06085069927052761
+maximum_pressure_kPa = 190.4856095054562
+
+[[conversion_check]]
+test_id              = "small-2"
+sample_count         = 28
+maximum_sinkage_m    = 0.060647189744746
+maximum_pressure_kPa = 196.39292957032262
+
+[[conversion_check]]
+test_id              = "small-3"
+sample_count         = 28
+maximum_sinkage_m    = 0.06416404450002984
+maximum_pressure_kPa = 190.4601469189697
+
+[[conversion_check]]
+test_id              = "small-4"
+sample_count         = 28
+maximum_sinkage_m    = 0.05026044189043441
+maximum_pressure_kPa = 191.6568884838349
+
+[[conversion_check]]
+test_id              = "small-5"
+sample_count         = 28
+maximum_sinkage_m    = 0.0461671633069223
+maximum_pressure_kPa = 191.40226261896993
+
+[[conversion_check]]
+test_id              = "medium-1"
+sample_count         = 28
+maximum_sinkage_m    = 0.006021540751647481
+maximum_pressure_kPa = 106.33168293961198
+
+[[conversion_check]]
+test_id              = "medium-2"
+sample_count         = 28
+maximum_sinkage_m    = 0.006553324005977794
+maximum_pressure_kPa = 106.68508523600794
+
+[[conversion_check]]
+test_id              = "medium-3"
+sample_count         = 28
+maximum_sinkage_m    = 0.006214213345597088
+maximum_pressure_kPa = 107.22225672652975
+
+[[conversion_check]]
+test_id              = "medium-4"
+sample_count         = 28
+maximum_sinkage_m    = 0.007178021870585193
+maximum_pressure_kPa = 107.29293718580895
+
+[[conversion_check]]
+test_id              = "medium-5"
+sample_count         = 27
+maximum_sinkage_m    = 0.005953333906520485
+maximum_pressure_kPa = 107.4201620125115
+
+[[conversion_check]]
+test_id              = "large-1"
+sample_count         = 28
+maximum_sinkage_m    = 0.007459921831874254
+maximum_pressure_kPa = 31.557310909645345
+
+[[conversion_check]]
+test_id              = "large-2"
+sample_count         = 27
+maximum_sinkage_m    = 0.005646867124822173
+maximum_pressure_kPa = 31.504348730220435
+
+[[conversion_check]]
+test_id              = "large-3"
+sample_count         = 27
+maximum_sinkage_m    = 0.006202807611675985
+maximum_pressure_kPa = 31.8424918757795
+
+[[conversion_check]]
+test_id              = "large-4"
+sample_count         = 28
+maximum_sinkage_m    = 0.006680211923159161
+maximum_pressure_kPa = 32.00952644165808
+
+[[conversion_check]]
+test_id              = "large-5"
+sample_count         = 28
+maximum_sinkage_m    = 0.005409137627789917
+maximum_pressure_kPa = 31.598051047664512
