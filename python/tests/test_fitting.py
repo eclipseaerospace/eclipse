@@ -17,6 +17,7 @@ import pytest
 from conftest import observations_from
 
 from biome.fitting import (
+    Estimator,
     PressureSinkageObservations,
     WeightingScheme,
     coefficient_of_determination,
@@ -26,6 +27,7 @@ from biome.fitting import (
     fit_shared_power_law,
     mean_relative_residual,
     parameter_bound_under_bias_permutation,
+    profile_cohesive_modulus,
     relative_deviation,
 )
 from biome.io.soil import CalibratedContactModel
@@ -423,3 +425,112 @@ def test_the_permutation_bound_needs_one_bias_per_plate(
     exact = observations_from(published_models["bekker"], tested_half_widths)
     with pytest.raises(ValueError, match="biases for .* plates"):
         parameter_bound_under_bias_permutation("bekker", exact, [0.0, 0.0])
+
+
+ESTIMATORS: list[Estimator] = ["two_stage", "direct"]
+
+
+@pytest.mark.parametrize("model_id", ["bekker", "reece"])
+@pytest.mark.parametrize("estimator", ESTIMATORS)
+def test_both_estimators_recover_the_generating_parameters(
+    model_id: str,
+    estimator: Estimator,
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+) -> None:
+    published = published_models[model_id]
+    fitted = fit_contact_model(
+        model_id,
+        observations_from(published, tested_half_widths),
+        weighting="uniform",
+        estimator=estimator,
+    )
+    assert fitted.estimator == estimator
+    for name, published_value in published.parameters.items():
+        assert fitted.parameters[name] == pytest.approx(published_value, rel=1e-6), (
+            f"{model_id}/{estimator} did not recover {name}"
+        )
+
+
+@pytest.mark.parametrize("model_id", ["bekker", "reece"])
+def test_the_two_estimators_agree_on_noiseless_data(
+    model_id: str,
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+) -> None:
+    exact = observations_from(published_models[model_id], tested_half_widths)
+    staged = fit_contact_model(model_id, exact, estimator="two_stage")
+    direct = fit_contact_model(model_id, exact, estimator="direct")
+    for name in staged.parameters:
+        assert staged.parameters[name] == pytest.approx(
+            direct.parameters[name], rel=1e-5
+        ), f"{name} differs between estimators on data that lies exactly on the model"
+
+
+def test_the_profile_minimum_is_the_direct_fit(
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+) -> None:
+    exact = observations_from(published_models["bekker"], tested_half_widths)
+    direct = fit_contact_model("bekker", exact, weighting="uniform", estimator="direct")
+    centre = direct.parameters["cohesive_modulus"]
+    profile = profile_cohesive_modulus(
+        "bekker", exact, np.linspace(centre - 20.0, centre + 20.0, 201),
+        weighting="uniform",
+    )
+    assert profile.minimum_value == pytest.approx(centre, abs=0.3), (
+        "the profile is the direct fit with one parameter held, so its minimum "
+        "must be the direct fit"
+    )
+    assert profile.parameter == "cohesive_modulus"
+    assert profile.free_parameter_count == 3
+
+
+def test_a_profile_of_noiseless_data_is_sharp(
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+) -> None:
+    exact = observations_from(published_models["bekker"], tested_half_widths)
+    centre = published_models["bekker"].parameters["cohesive_modulus"]
+    profile = profile_cohesive_modulus(
+        "bekker", exact, np.linspace(centre - 15.0, centre + 15.0, 601),
+        weighting="uniform",
+    )
+    low, high = profile.confidence_interval()
+    assert low <= centre <= high
+    assert (high - low) / abs(centre) < 0.01, (
+        "data lying exactly on the model must determine the parameter sharply"
+    )
+
+
+def test_a_profile_narrower_than_its_own_interval_is_refused(
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+) -> None:
+    exact = observations_from(published_models["bekker"], tested_half_widths)
+    generator = np.random.default_rng(20260808)
+    noisy = PressureSinkageObservations(
+        contact_half_width_m=exact.contact_half_width_m,
+        sinkage_m=exact.sinkage_m,
+        pressure_kPa=exact.pressure_kPa
+        * (1.0 + generator.normal(0.0, 0.10, exact.count)),
+    )
+    direct = fit_contact_model("bekker", noisy, weighting="uniform", estimator="direct")
+    centre = direct.parameters["cohesive_modulus"]
+    profile = profile_cohesive_modulus(
+        "bekker", noisy, np.linspace(centre - 0.5, centre + 0.5, 21),
+        weighting="uniform",
+    )
+    with pytest.raises(ValueError, match="reaches the edge of the profiled range"):
+        profile.confidence_interval()
+
+
+def test_an_unprofilable_model_is_refused(
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+) -> None:
+    exact = observations_from(published_models["bekker"], tested_half_widths)
+    with pytest.raises(ValueError, match="no log-linear form is implemented"):
+        profile_cohesive_modulus(
+            "dimensional_analysis_lim2021", exact, np.linspace(-50.0, -30.0, 5)
+        )
