@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# biome.io.soil — load curated soil parameter files into typed objects.
+# eclipse.io.soil — load curated soil parameter files into typed objects.
 #
 # Every table that becomes a dataclass is constructed with **, so a renamed,
 # missing or unexpected key fails at load rather than being silently dropped.
@@ -29,8 +29,8 @@ from typing import Any, Final, TypeVar
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from biome._validation import first_violation
-from biome.terramechanics import CONTACT_MODELS, ContactModel
+from eclipse._validation import first_violation
+from eclipse.terramechanics import CONTACT_MODELS, ContactModel
 
 __all__ = [
     "Apparatus",

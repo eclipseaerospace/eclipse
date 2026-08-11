@@ -2,8 +2,8 @@
 #
 # calibration/contact/pressure_sinkage.py — pressure-sinkage calibration.
 #
-# A thin runner for both campaigns. Loading lives in biome.io, resampling in
-# biome.resampling and fitting in biome.fitting, so all three are unit tested
+# A thin runner for both campaigns. Loading lives in eclipse.io, resampling in
+# eclipse.resampling and fitting in eclipse.fitting, so all three are unit tested
 # and type checked; this file wires paths, draws, and writes the results.
 #
 # Two campaigns, one drawing core. KLS-1 compares two published models on one
@@ -50,7 +50,7 @@ from matplotlib.legend_handler import HandlerTuple
 from matplotlib.lines import Line2D
 from numpy.typing import NDArray
 
-from biome.fitting import (
+from eclipse.fitting import (
     DEFAULT_WEIGHTING,
     FittedContactModel,
     PressureSinkageObservations,
@@ -62,18 +62,18 @@ from biome.fitting import (
     parameter_bound_under_bias_permutation,
     relative_deviation,
 )
-from biome.io.channels import (
+from eclipse.io.channels import (
     BevameterChannels,
     ChannelsFileError,
     load_bevameter_channels,
 )
-from biome.io.series import (
+from eclipse.io.series import (
     PressureSinkageSeries,
     SeriesFileError,
     load_pressure_sinkage_series,
 )
-from biome.io.soil import CalibratedContactModel, Dataset, Soil, load_soil
-from biome.resampling import EnsembleCurve, ensemble
+from eclipse.io.soil import CalibratedContactModel, Dataset, Soil, load_soil
+from eclipse.resampling import EnsembleCurve, ensemble
 
 REPOSITORY_ROOT: Final = Path(__file__).resolve().parents[2]
 LITERATURE: Final = REPOSITORY_ROOT / "data" / "literature"

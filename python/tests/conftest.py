@@ -21,8 +21,8 @@ from typing import Final
 import numpy as np
 import pytest
 
-from biome.fitting import PressureSinkageObservations
-from biome.io.soil import CalibratedContactModel, load_soil
+from eclipse.fitting import PressureSinkageObservations
+from eclipse.io.soil import CalibratedContactModel, load_soil
 
 REPOSITORY_ROOT: Final = Path(__file__).resolve().parents[2]
 REFERENCE_SOIL_PATH: Final = REPOSITORY_ROOT / "data" / "soils" / "kls1.toml"

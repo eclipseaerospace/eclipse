@@ -1574,7 +1574,7 @@ packages:
   size: 433413
   timestamp: 1764777166076
 - pypi: ./
-  name: biome
+  name: eclipse
   requires_dist:
   - numpy>=2.0
   requires_python: '>=3.12'

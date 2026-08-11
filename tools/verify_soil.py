@@ -3,11 +3,11 @@
 #
 # tools/verify_soil.py — check and regenerate verification blocks in soil files.
 #
-# Independent by construction: standard library only, nothing from biome. A
+# Independent by construction: standard library only, nothing from eclipse. A
 # verifier that imports the code it checks proves only that the code agrees
 # with itself. The equations below are typed from the cited papers and
 # evaluated with scalar math.pow, so even the numerical path shares nothing
-# with biome.terramechanics.
+# with eclipse.terramechanics.
 #
 # --check, the default, recomputes the pressure at each stored case's own
 # operating point and compares. --write regenerates the case set across the
@@ -267,7 +267,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Check or regenerate the verification blocks in soil files, using "
-            "equations typed independently of biome."
+            "equations typed independently of eclipse."
         )
     )
     parser.add_argument("paths", nargs="*", type=Path)

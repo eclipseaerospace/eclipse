@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# Tests for biome.resampling.
+# Tests for eclipse.resampling.
 #
 # The interpolant is checked against the properties that define it rather than
 # against stored numbers: it passes through every sample, its first and second
@@ -14,7 +14,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from biome.resampling import (
+from eclipse.resampling import (
     MINIMUM_SPLINE_SAMPLES,
     ensemble,
     resample_cubic,

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# Tests for biome.fitting.
+# Tests for eclipse.fitting.
 #
 # The load-bearing test is parameter recovery: given exact output of a published
 # model, the fit must return exactly the parameters that produced it. That is
@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 from conftest import observations_from
 
-from biome.fitting import (
+from eclipse.fitting import (
     Estimator,
     PressureSinkageObservations,
     WeightingScheme,
@@ -31,7 +31,7 @@ from biome.fitting import (
     profile_cohesive_modulus,
     relative_deviation,
 )
-from biome.io.soil import CalibratedContactModel
+from eclipse.io.soil import CalibratedContactModel
 
 EXACT_RECOVERY_TOLERANCE = 1e-9
 NOISY_RECOVERY_TOLERANCE = 0.05

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# biome.io.series — load digitized measurement series from a manifest and CSV.
+# eclipse.io.series — load digitized measurement series from a manifest and CSV.
 #
 # Provenance lives in TOML and the numbers live in CSV, following the split the
 # project uses everywhere else. The manifest names the source figure, the tool
@@ -28,7 +28,7 @@ from typing import Any, Final, TypeVar
 
 import numpy as np
 
-from biome.fitting import PressureSinkageObservations
+from eclipse.fitting import PressureSinkageObservations
 
 __all__ = [
     "AxisCalibration",

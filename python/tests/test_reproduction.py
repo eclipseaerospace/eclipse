@@ -5,7 +5,7 @@
 # This is the test the GRC-1 transcription exists to support: raw sensor
 # readings, converted, resampled onto the recorded grid, fitted by the
 # published estimator, must return the published parameters. It exercises
-# biome.io.channels, biome.resampling and biome.fitting together, which is
+# eclipse.io.channels, eclipse.resampling and eclipse.fitting together, which is
 # where a factor that each module considers reasonable would otherwise survive.
 #
 # Every expected value and every preprocessing choice is read from the manifest.
@@ -25,9 +25,9 @@ from typing import Any
 import numpy as np
 import pytest
 
-from biome.fitting import PressureSinkageObservations, fit_contact_model
-from biome.io.channels import BevameterChannels, load_bevameter_channels
-from biome.resampling import ensemble
+from eclipse.fitting import PressureSinkageObservations, fit_contact_model
+from eclipse.io.channels import BevameterChannels, load_bevameter_channels
+from eclipse.resampling import ensemble
 
 LITERATURE = Path(__file__).resolve().parents[2] / "data" / "literature"
 MANIFEST = LITERATURE / "oravec2009-grc1-raw-channels.toml"

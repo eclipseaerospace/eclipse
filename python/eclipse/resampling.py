@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# biome.resampling — put repeat tests on a common grid and average them.
+# eclipse.resampling — put repeat tests on a common grid and average them.
 #
 # Repeat bevameter tests stop at whatever pressure each run reached and sample
 # it at whatever points the operator loaded, so the runs share no abscissa and
@@ -33,7 +33,7 @@ from typing import Final
 import numpy as np
 from numpy.typing import NDArray
 
-from biome._validation import first_violation
+from eclipse._validation import first_violation
 
 __all__ = [
     "EnsembleCurve",

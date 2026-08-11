@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# Tests for biome.io.channels.
+# Tests for eclipse.io.channels.
 #
 # The committed GRC-1 file is the fixture. Corruptions are applied to a copy of
 # it, and each asserts its target was present before mutating, so a mutation
 # that silently fails to apply cannot masquerade as a passing test.
 #
 # Expected converted values are read from the file's own conversion_check
-# blocks, which tools/verify_channels.py generates without importing biome.
+# blocks, which tools/verify_channels.py generates without importing eclipse.
 # Nothing numeric is written down here.
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from biome.io.channels import (
+from eclipse.io.channels import (
     ChannelsFileError,
     Plate,
     load_bevameter_channels,
@@ -147,7 +147,7 @@ def test_a_converted_series_is_refused_by_this_loader(
         'kind           = "raw_bevameter_channels"',
         'kind           = "pressure_sinkage"',
     )
-    with pytest.raises(ChannelsFileError, match="biome.io.series"):
+    with pytest.raises(ChannelsFileError, match="eclipse.io.series"):
         load_bevameter_channels(channels_manifest)
 
 

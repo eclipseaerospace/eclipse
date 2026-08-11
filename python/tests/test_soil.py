@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# Tests for biome.io.soil.
+# Tests for eclipse.io.soil.
 #
 # Structural tests corrupt a copy of a real soil file rather than inventing a
 # synthetic one, so they stay honest about the schema actually in use. Every
@@ -17,14 +17,14 @@ from typing import Final
 import numpy as np
 import pytest
 
-from biome.io.soil import (
+from eclipse.io.soil import (
     CalibratedContactModel,
     OutsideValidityRangeError,
     Soil,
     SoilFileError,
     load_soil,
 )
-from biome.terramechanics import ContactModel, DegenerateContactModelError
+from eclipse.terramechanics import ContactModel, DegenerateContactModelError
 
 REPOSITORY_ROOT: Final = Path(__file__).resolve().parents[2]
 SOIL_DIRECTORY: Final = REPOSITORY_ROOT / "data" / "soils"

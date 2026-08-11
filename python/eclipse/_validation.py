@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# biome._validation — shared reporting for array guard failures.
+# eclipse._validation — shared reporting for array guard failures.
 #
 # Private. Exists so that terramechanics and io.soil report a rejected array
 # the same way, rather than drifting into two dialects of the same message.

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# Tests for biome.terramechanics.
+# Tests for eclipse.terramechanics.
 #
 # Known-answer cases are read from the soil files in data/soils, never written
 # here, so adding a soil adds its own tests and a transcription change fails
@@ -24,7 +24,7 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from biome.terramechanics import (
+from eclipse.terramechanics import (
     CONTACT_MODELS,
     BekkerModel,
     ContactModel,

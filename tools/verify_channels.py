@@ -4,7 +4,7 @@
 # tools/verify_channels.py — check and regenerate conversion blocks in raw
 # bevameter channel files.
 #
-# Independent by construction: standard library only, nothing from biome and no
+# Independent by construction: standard library only, nothing from eclipse and no
 # numpy. A verifier that imports the code it checks proves only that the code
 # agrees with itself, so the arithmetic below is typed from the conversion the
 # manifest documents and evaluated one scalar at a time.
@@ -210,7 +210,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Check raw bevameter channel files by converting them independently "
-            "of biome."
+            "of eclipse."
         )
     )
     parser.add_argument("paths", nargs="*", type=Path)

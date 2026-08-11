@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# Tests for biome.io.series.
+# Tests for eclipse.io.series.
 #
 # Corruptions are applied to a valid pair written by the fixture, and each one
 # asserts its target was present before mutating, so a mutation that silently
@@ -15,8 +15,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from biome.io.series import SeriesFileError, load_pressure_sinkage_series
-from biome.io.soil import CalibratedContactModel
+from eclipse.io.series import SeriesFileError, load_pressure_sinkage_series
+from eclipse.io.soil import CalibratedContactModel
 
 
 def _corrupt(manifest_path: Path, old: str, new: str) -> Path:

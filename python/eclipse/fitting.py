@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# biome.fitting — recover contact model parameters from measured pressure-sinkage data.
+# eclipse.fitting — recover contact model parameters from measured pressure-sinkage data.
 #
 # Two estimators of the same model. They are not equivalent on real data, and a
 # published parameter rarely states which was used, so both are selectable and
@@ -59,8 +59,8 @@ from typing import Final, Literal
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from biome._validation import first_violation
-from biome.terramechanics import CONTACT_MODELS, ContactModel
+from eclipse._validation import first_violation
+from eclipse.terramechanics import CONTACT_MODELS, ContactModel
 
 __all__ = [
     "DEFAULT_ESTIMATOR",

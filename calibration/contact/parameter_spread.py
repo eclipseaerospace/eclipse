@@ -47,15 +47,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.figure import Figure
 
-from biome.fitting import (
+from eclipse.fitting import (
     Estimator,
     PressureSinkageObservations,
     WeightingScheme,
     fit_contact_model,
 )
-from biome.io.channels import BevameterChannels, load_bevameter_channels
-from biome.io.series import load_pressure_sinkage_series
-from biome.resampling import ensemble
+from eclipse.io.channels import BevameterChannels, load_bevameter_channels
+from eclipse.io.series import load_pressure_sinkage_series
+from eclipse.resampling import ensemble
 
 REPOSITORY_ROOT: Final = Path(__file__).resolve().parents[2]
 LITERATURE: Final = REPOSITORY_ROOT / "data" / "literature"

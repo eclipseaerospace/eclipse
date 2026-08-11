@@ -1,7 +1,7 @@
 [workspace]
 authors = ["b1aha <jiriblahaa@outlook.cz>"]
 channels = ["conda-forge"]
-name = "biome"
+name = "eclipse"
 platforms = ["osx-arm64"]
 version = "0.1.0"
 
@@ -10,7 +10,7 @@ test      = "pytest"
 typecheck = "mypy"
 
 [pypi-dependencies]
-biome = { path = ".", editable = true }
+eclipse = { path = ".", editable = true }
 
 [dependencies]
 python = ">=3.12,<3.13"

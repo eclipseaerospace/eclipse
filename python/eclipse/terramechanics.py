@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# biome.terramechanics — quasi-static pressure-sinkage contact models.
+# eclipse.terramechanics — quasi-static pressure-sinkage contact models.
 #
 # Pure and array-first: no I/O, no unit conversion, no parameter loading.
 # Both models are monotone power laws in sinkage whose deformation modulus
@@ -30,7 +30,7 @@ from typing import Final, Protocol, runtime_checkable
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from biome._validation import first_violation
+from eclipse._validation import first_violation
 
 __all__ = [
     "CONTACT_MODELS",

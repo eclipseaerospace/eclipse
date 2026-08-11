@@ -17,7 +17,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name            = "biome"
+name            = "eclipse"
 version         = "0.1.0"
 description     = "Simulation and autonomy stack for legged robots on deformable terrain"
 requires-python = ">=3.12"
@@ -27,13 +27,13 @@ authors         = [{ name = "b1aha", email = "jiriblahaa@outlook.cz" }]
 dependencies    = ["numpy>=2.0"]
 
 [project.urls]
-Repository = "https://github.com/biome-robotics/biome"
+Repository = "https://github.com/eclipseaerospace/eclipse"
 
 [tool.hatch.build.targets.wheel]
-packages = ["python/biome"]
+packages = ["python/eclipse"]
 
 [tool.hatch.build.targets.sdist]
-include = ["python/biome", "pyproject.toml"]
+include = ["python/eclipse", "pyproject.toml"]
 
 [tool.pytest.ini_options]
 testpaths      = ["python/tests"]

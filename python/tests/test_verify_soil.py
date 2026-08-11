@@ -2,7 +2,7 @@
 #
 # Tests for tools/verify_soil.py.
 #
-# The verifier's only value is that it can disagree with biome, so these tests
+# The verifier's only value is that it can disagree with eclipse, so these tests
 # assert its independence structurally and then run it against the real corpus.
 # Running it is paired with running it against a deliberately corrupted copy,
 # because a --check that always succeeds would pass the first test alone.
@@ -48,9 +48,9 @@ def test_verifier_exists() -> None:
     assert SOIL_PATHS, f"no soil files under {SOIL_DIRECTORY}"
 
 
-def test_verifier_imports_nothing_from_biome() -> None:
+def test_verifier_imports_nothing_from_eclipse() -> None:
     offending = sorted(
-        name for name in _imported_modules() if name.split(".")[0] == "biome"
+        name for name in _imported_modules() if name.split(".")[0] == "eclipse"
     )
     assert not offending, (
         f"verify_soil.py imports {offending} from the library it checks, which "
@@ -66,7 +66,7 @@ def test_verifier_imports_only_the_standard_library() -> None:
     )
     assert not offending, (
         f"verify_soil.py imports {offending}; the verifier stays standard "
-        "library only so its numerical path shares nothing with biome, not "
+        "library only so its numerical path shares nothing with eclipse, not "
         "even numpy"
     )
 

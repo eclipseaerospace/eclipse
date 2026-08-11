@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# biome.io.channels — load raw bevameter sensor channels and convert them.
+# eclipse.io.channels — load raw bevameter sensor channels and convert them.
 #
 # The file this reads holds instrument readings, not measurements: displacement
 # in millivolts and load in millivolts per volt, exactly as the source printed
@@ -309,7 +309,7 @@ def load_bevameter_channels(manifest_path: Path | str) -> BevameterChannels:
         raise ChannelsFileError(
             f"{manifest_path}: kind is {kind!r}, this loader reads "
             f"{RAW_CHANNELS_KIND!r}. Converted pressure-sinkage series are read by "
-            "biome.io.series instead"
+            "eclipse.io.series instead"
         )
 
     context = f"{manifest_path} channels {manifest.get('id', '<unnamed>')}"
