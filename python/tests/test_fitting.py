@@ -24,6 +24,7 @@ from biome.fitting import (
     coefficient_of_determination_by_plate,
     coefficient_of_determination_ceiling,
     fit_contact_model,
+    fit_averaged_power_law,
     fit_shared_power_law,
     mean_relative_residual,
     parameter_bound_under_bias_permutation,
@@ -534,3 +535,103 @@ def test_an_unprofilable_model_is_refused(
         profile_cohesive_modulus(
             "dimensional_analysis_lim2021", exact, np.linspace(-50.0, -30.0, 5)
         )
+
+
+def _single_plate(
+    half_width: float, exponent: float, modulus: float
+) -> PressureSinkageObservations:
+    sinkage = np.linspace(0.01, 0.09, 25)
+    return PressureSinkageObservations(
+        contact_half_width_m=np.full(sinkage.size, half_width),
+        sinkage_m=sinkage,
+        pressure_kPa=modulus * sinkage**exponent,
+    )
+
+
+def test_averaging_recovers_an_exact_model(
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+) -> None:
+    exact = observations_from(published_models["bekker"], tested_half_widths)
+    published = published_models["bekker"].extrapolating
+    fit = fit_contact_model("bekker", exact, estimator="averaged_exponent")
+    for name in ("sinkage_exponent", "cohesive_modulus", "frictional_modulus"):
+        assert fit.parameters[name] == pytest.approx(
+            getattr(published, name), rel=1e-9
+        ), (
+            "every plate carries the same exponent in exact model output, so "
+            "averaging per-plate exponents must recover it as sharing one does"
+        )
+
+
+def test_the_exponent_is_the_mean_of_the_per_plate_exponents() -> None:
+    exponents = (0.9, 1.2, 1.5)
+    half_widths = (0.03, 0.05, 0.09)
+    blocks = [
+        _single_plate(half_width, exponent, 2000.0)
+        for half_width, exponent in zip(half_widths, exponents)
+    ]
+    combined = PressureSinkageObservations(
+        contact_half_width_m=np.concatenate([b.contact_half_width_m for b in blocks]),
+        sinkage_m=np.concatenate([b.sinkage_m for b in blocks]),
+        pressure_kPa=np.concatenate([b.pressure_kPa for b in blocks]),
+    )
+    separately = [
+        fit_averaged_power_law(block).sinkage_exponent for block in blocks
+    ]
+    np.testing.assert_allclose(separately, exponents, rtol=1e-9)
+    assert fit_averaged_power_law(combined).sinkage_exponent == pytest.approx(
+        float(np.mean(exponents)), rel=1e-9
+    )
+
+
+def test_averaging_and_sharing_differ_when_the_plates_disagree() -> None:
+    blocks = [
+        _single_plate(half_width, exponent, 2000.0)
+        for half_width, exponent in zip((0.03, 0.05, 0.09), (0.9, 1.2, 1.5))
+    ]
+    combined = PressureSinkageObservations(
+        contact_half_width_m=np.concatenate([b.contact_half_width_m for b in blocks]),
+        sinkage_m=np.concatenate([b.sinkage_m for b in blocks]),
+        pressure_kPa=np.concatenate([b.pressure_kPa for b in blocks]),
+    )
+    averaged = fit_contact_model("bekker", combined, estimator="averaged_exponent")
+    shared = fit_contact_model("bekker", combined, estimator="two_stage")
+    assert averaged.parameters["cohesive_modulus"] != pytest.approx(
+        shared.parameters["cohesive_modulus"], rel=1e-6
+    ), (
+        "the two estimators coincide only when every plate carries the same "
+        "exponent; if they agree here the averaging is not being applied"
+    )
+
+
+def test_a_plate_with_one_sinkage_cannot_give_an_exponent() -> None:
+    flat = PressureSinkageObservations(
+        contact_half_width_m=np.array([0.03, 0.03, 0.05, 0.05]),
+        sinkage_m=np.array([0.02, 0.02, 0.02, 0.04]),
+        pressure_kPa=np.array([10.0, 12.0, 11.0, 20.0]),
+    )
+    with pytest.raises(ValueError, match="share one sinkage value"):
+        fit_contact_model("bekker", flat, estimator="averaged_exponent")
+
+
+def test_sinkages_that_differ_only_by_rounding_cannot_give_an_exponent() -> None:
+    almost = 0.02 * (1.0 + 1e-15)
+    degenerate = PressureSinkageObservations(
+        contact_half_width_m=np.array([0.03, 0.03, 0.05, 0.05]),
+        sinkage_m=np.array([0.02, almost, 0.02, 0.04]),
+        pressure_kPa=np.array([10.0, 12.0, 11.0, 20.0]),
+    )
+    with pytest.raises(ValueError, match="too narrow in"):
+        fit_contact_model("bekker", degenerate, estimator="averaged_exponent")
+
+
+@pytest.mark.parametrize("model_id", ["bekker", "reece"])
+def test_the_estimator_is_recorded_on_the_fit(
+    published_models: Mapping[str, CalibratedContactModel],
+    tested_half_widths: np.ndarray,
+    model_id: str,
+) -> None:
+    exact = observations_from(published_models[model_id], tested_half_widths)
+    fit = fit_contact_model(model_id, exact, estimator="averaged_exponent")
+    assert fit.estimator == "averaged_exponent"

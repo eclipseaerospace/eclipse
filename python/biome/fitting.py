@@ -19,6 +19,14 @@
 #      rescales by half_width^exponent and regresses on half_width, giving
 #      intercept k_c and slope k_phi.
 #
+# The averaged_exponent estimator replaces step one only: it fits an exponent
+# to each plate separately and takes the arithmetic mean, then evaluates each
+# plate's modulus at that mean. That is the procedure Wong describes and that
+# published bevameter analyses implement, and it is not the same estimator as
+# sharing an exponent across a single joint fit. On the same observations under
+# the same weighting the two differ by tens of percent in k_c, which is why
+# both are selectable rather than one standing in for the other.
+#
 # Weighting is explicit because it changes the answer. Unweighted least squares
 # in log space minimizes relative rather than absolute error and biases the fit
 # toward small pressures; weighting each log residual by the squared pressure
@@ -66,6 +74,7 @@ __all__ = [
     "coefficient_of_determination",
     "coefficient_of_determination_by_plate",
     "coefficient_of_determination_ceiling",
+    "fit_averaged_power_law",
     "fit_contact_model",
     "fit_shared_power_law",
     "mean_relative_residual",
@@ -76,7 +85,7 @@ __all__ = [
 
 WeightingScheme = Literal["uniform", "pressure_squared"]
 DEFAULT_WEIGHTING: Final[WeightingScheme] = "pressure_squared"
-Estimator = Literal["two_stage", "direct"]
+Estimator = Literal["two_stage", "averaged_exponent", "direct"]
 DEFAULT_ESTIMATOR: Final[Estimator] = "two_stage"
 PROFILE_CONFIDENCE_LEVEL: Final = 0.95
 _TWO_SIDED_NORMAL_QUANTILE: Final = 1.959963984540054
@@ -84,6 +93,10 @@ _BRACKET_STEP_LIMIT: Final = 200
 _GOLDEN_SECTION_ITERATIONS: Final = 200
 _DIRECT_SEARCH_SAMPLES: Final = 400
 MINIMUM_PLATES_FOR_PLATE_SCALING: Final = 2
+# Centring identical logarithms cancels to rounding error rather than to zero,
+# so a per-plate exponent must reject on the spread relative to its own scale.
+# Testing against zero lets a ratio of two noise terms through as a fit.
+_LOG_SPREAD_RELATIVE_FLOOR: Final = 1e-12
 DEFAULT_REPLICATE_TOLERANCE_M: Final = 2e-3
 
 
@@ -272,6 +285,70 @@ def fit_shared_power_law(
         sinkage_exponent=float(solution[0]),
         contact_half_widths_m=plates,
         plate_moduli=np.exp(solution[1:]),
+        weighting=weighting,
+        observation_count=observations.count,
+    )
+
+
+def _plate_exponent(
+    observations: PressureSinkageObservations, weighting: WeightingScheme
+) -> float:
+    distinct = np.unique(observations.sinkage_m)
+    if distinct.size < 2:
+        raise ValueError(
+            f"the {observations.count} observations on this plate share one "
+            f"sinkage value, {float(distinct[0])}, so a power law through them "
+            "has no slope; a per-plate exponent needs at least two distinct "
+            "sinkages"
+        )
+    weights = _log_space_weights(observations.pressure_kPa, weighting)
+    log_sinkage = np.log(observations.sinkage_m)
+    log_pressure = np.log(observations.pressure_kPa)
+    total = np.sum(weights)
+    centred_sinkage = log_sinkage - np.sum(weights * log_sinkage) / total
+    centred_pressure = log_pressure - np.sum(weights * log_pressure) / total
+    spread = np.sum(weights * centred_sinkage**2)
+    scale = np.sum(weights * np.square(log_sinkage))
+    if not spread > _LOG_SPREAD_RELATIVE_FLOOR * scale:
+        raise ValueError(
+            f"the {distinct.size} distinct sinkage values on this plate span "
+            f"{float(distinct.min())} to {float(distinct.max())}, too narrow in "
+            f"log space to carry an exponent: the weighted spread is "
+            f"{float(spread)} against a scale of {float(scale)}. Centring "
+            "near-identical logarithms leaves rounding error, and a slope "
+            "through that is noise wearing the shape of a fit"
+        )
+    return float(np.sum(weights * centred_sinkage * centred_pressure) / spread)
+
+
+def _plate_modulus(
+    observations: PressureSinkageObservations,
+    exponent: float,
+    weighting: WeightingScheme,
+) -> float:
+    weights = _log_space_weights(observations.pressure_kPa, weighting)
+    residual = np.log(observations.pressure_kPa) - exponent * np.log(
+        observations.sinkage_m
+    )
+    return float(np.exp(np.sum(weights * residual) / np.sum(weights)))
+
+
+def fit_averaged_power_law(
+    observations: PressureSinkageObservations,
+    *,
+    weighting: WeightingScheme = DEFAULT_WEIGHTING,
+) -> PowerLawFit:
+    plates = observations.contact_half_widths
+    by_plate = [observations.for_plate(plate) for plate in plates]
+    exponent = float(
+        np.mean([_plate_exponent(selected, weighting) for selected in by_plate])
+    )
+    return PowerLawFit(
+        sinkage_exponent=exponent,
+        contact_half_widths_m=plates,
+        plate_moduli=np.array(
+            [_plate_modulus(selected, exponent, weighting) for selected in by_plate]
+        ),
         weighting=weighting,
         observation_count=observations.count,
     )
@@ -521,6 +598,10 @@ def fit_contact_model(
         )
     if estimator == "direct":
         parameters = _fit_directly(model_id, observations, weighting)
+    elif estimator == "averaged_exponent":
+        parameters = PLATE_SCALINGS[model_id](
+            fit_averaged_power_law(observations, weighting=weighting)
+        )
     else:
         parameters = PLATE_SCALINGS[model_id](
             fit_shared_power_law(observations, weighting=weighting)
