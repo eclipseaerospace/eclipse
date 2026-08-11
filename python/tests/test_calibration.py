@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# Tests for calibration/contact/sinkage.py.
+# Tests for calibration/contact/pressure_sinkage.py, KLS-1 campaign.
 #
 # Run as a subprocess rather than imported, because it is a script and its entry
 # point is what the repository invokes to regenerate the committed outputs. A
@@ -23,7 +23,10 @@ from typing import Any, Final
 import pytest
 
 REPOSITORY_ROOT: Final = Path(__file__).resolve().parents[2]
-SCRIPT_PATH: Final = REPOSITORY_ROOT / "calibration" / "contact" / "sinkage.py"
+SCRIPT_PATH: Final = (
+    REPOSITORY_ROOT / "calibration" / "contact" / "pressure_sinkage.py"
+)
+CAMPAIGN: Final = "kls1"
 COMMITTED_FIGURE: Final = (
     REPOSITORY_ROOT / "calibration" / "contact" / "figures" / "kls1-pressure-sinkage.png"
 )
@@ -36,7 +39,10 @@ EXPECTED_MODELS: Final = ("bekker", "reece")
 
 def _run(*arguments: str | Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, str(SCRIPT_PATH), *map(str, arguments)],
+        [
+            sys.executable, str(SCRIPT_PATH),
+            "--campaign", CAMPAIGN, *map(str, arguments),
+        ],
         capture_output=True,
         text=True,
         cwd=REPOSITORY_ROOT,
@@ -46,7 +52,9 @@ def _run(*arguments: str | Path) -> subprocess.CompletedProcess[str]:
 def _generate(tmp_path: Path, *extra: str | Path) -> dict[str, Any]:
     figure = tmp_path / "figure.png"
     report = tmp_path / "report.toml"
-    completed = _run("--figure", figure, "--report", report, *extra)
+    completed = _run(
+        f"--{CAMPAIGN}-figure", figure, f"--{CAMPAIGN}-report", report, *extra
+    )
     assert completed.returncode == 0, completed.stderr
     assert figure.is_file() and figure.stat().st_size > 0
     return {
@@ -160,7 +168,7 @@ def test_a_corrupt_series_is_reported_rather_than_plotted(
     )
     figure = tmp_path / "figure.png"
     report = tmp_path / "report.toml"
-    completed = _run("--series", digitized_series, "--figure", figure, "--report", report)
+    completed = _run("--series", digitized_series, f"--{CAMPAIGN}-figure", figure, f"--{CAMPAIGN}-report", report)
     assert completed.returncode == 1
     assert "cannot read the digitized series" in completed.stderr
     assert "Traceback" not in completed.stderr, (
@@ -181,7 +189,8 @@ def test_a_soil_without_both_models_is_refused(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     completed = _run(
-        "--soil", reduced, "--figure", tmp_path / "f.png", "--report", tmp_path / "r.toml"
+        "--soil", reduced, f"--{CAMPAIGN}-figure", tmp_path / "f.png",
+        f"--{CAMPAIGN}-report", tmp_path / "r.toml",
     )
     assert completed.returncode != 0
     assert "no verified model" in completed.stderr
@@ -207,7 +216,7 @@ def test_a_series_too_small_to_fit_is_reported_not_raised(
 
     figure = tmp_path / "figure.png"
     report = tmp_path / "report.toml"
-    completed = _run("--series", digitized_series, "--figure", figure, "--report", report)
+    completed = _run("--series", digitized_series, f"--{CAMPAIGN}-figure", figure, f"--{CAMPAIGN}-report", report)
     assert completed.returncode == 0, completed.stderr
     assert "cannot support a fit" in completed.stderr
     assert "Traceback" not in completed.stderr, (
