@@ -10,18 +10,28 @@
 # needs answered, because a foot is a contact patch at a size no bevameter
 # plate reaches.
 #
-# The answer is negative, and the negative result is the deliverable.
+# The answer is negative, and the negative result is the deliverable. What the
+# negative result means took a second experiment to establish, and it is not
+# what this file originally claimed.
 #
-# Mechanism first: Bekker assumes one sinkage exponent for the soil, and the
-# three plates disagree about it by 35 to 45 percent. That holds when all three
-# are fitted over one common pressure window, so it is a property of the plates
-# rather than of the analysis range. Each plate's own modulus therefore carries
-# units of kN/m^(n+1) at its own n — three different dimensions — and the plate
-# scaling regresses them against 1/b as if they were commensurable. Averaging
-# the exponent is what makes that step possible at all.
+# resolving_power.py generates data from a Bekker process with a single true
+# exponent, at this exact geometry and measured noise, and puts it through this
+# same pipeline. It yields 12.5 percent median interpolation error and 17
+# percent median apparent exponent disagreement. So the errors below are
+# ordinary draws from what a correct model produces anyway: the 16.5 percent
+# interpolation error sits at the 79th percentile of that distribution.
 #
-# Read alongside the window effect in calibration/: both are the same category
-# error. k_c and k_phi are meaningful only at fixed n, and n is not fixed.
+# What is measured here is therefore the resolving power of a three-plate
+# campaign at twenty percent ensemble noise, not a defect in Bekker's form. The
+# earlier reading of this file — that the plates' 45 percent exponent
+# disagreement showed their moduli were incommensurable and the model was
+# failing inside its own range — does not survive: most of that disagreement is
+# an estimation artifact of fitting three noisy curves.
+#
+# The 45 percent is still a 1-in-100 draw under a correct single-exponent model,
+# so something beyond noise may be present. That is suggestive and not more, and
+# one campaign cannot separate a tail draw from a real effect. It is the first
+# concrete question a second well-characterised campaign would answer.
 #
 # Holding one plate out of three leaves two, so the plate scaling is exactly
 # determined — zero residual, no redundancy. Each test is a genuine prediction
@@ -346,22 +356,23 @@ def build_figure(
             0.058, 0.924,
             "Each panel holds one plate out, fits the other two, and predicts the "
             "one it never saw. Exact sensor readings, no digitization error.\n"
-            "The mechanism: over one common window to "
-            f"{common_top_kPa:.0f} kPa the three plates disagree about the sinkage "
+            "Over one common window to "
+            f"{common_top_kPa:.0f} kPa the plates disagree about the sinkage "
             f"exponent by {spread * 100:.0f}% "
-            f"({' / '.join(f'{exponents[p]:.2f}' for p in PLATE_NAMES)}),\n"
-            "so each plate's modulus carries a different unit and the three are "
-            "not commensurable.",
+            f"({' / '.join(f'{exponents[p]:.2f}' for p in PLATE_NAMES)}) — but a "
+            "correct single-exponent model yields 17% here,\nso most of that is "
+            "an estimation artifact. See resolving_power.py: these errors are "
+            "ordinary draws from what a correct model produces at this noise.",
             fontsize=8.5, color=INK_SECONDARY, ha="left", va="top",
         )
         figure.text(
             0.058, 0.135,
-            "Bekker assumes one exponent for the soil. Where the plates disagree "
-            "about it, their moduli are not commensurable and the plate scaling "
-            "regresses quantities of different dimension.\n"
-            "Holding one plate out of three leaves two, so the scaling is exactly "
-            "determined: each test is a genuine prediction but confounds model "
-            "form, extrapolation distance and fit noise.\n"
+            "This measures what a three-plate campaign at twenty percent ensemble "
+            "noise can resolve, not a defect in Bekker's form: the 16.5% "
+            "interpolation error is the 79th percentile of what a correct model "
+            "gives.\nHolding one plate out of three leaves two, so the scaling is "
+            "exactly determined: each test is a genuine prediction but confounds "
+            "model form, extrapolation distance and fit noise.\n"
             f"Numbers behind this figure: {_display_path(report_path)}",
             fontsize=7.5, color=INK_MUTED, ha="left", va="top",
         )
