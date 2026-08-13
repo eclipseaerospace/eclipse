@@ -159,15 +159,11 @@ class HeldOut:
 
     @property
     def minimum_invertible_half_width_m(self) -> float:
-        return float(self.fit.model.minimum_invertible_half_width())
+        return float(self.fit.model.invertible_half_width_range().minimum)
 
     @property
     def maximum_invertible_half_width_m(self) -> float:
-        cohesive = self.fit.parameters["cohesive_modulus"]
-        frictional = self.fit.parameters["frictional_modulus"]
-        if frictional < 0.0 < cohesive:
-            return float(-cohesive / frictional)
-        return float("inf")
+        return float(self.fit.model.invertible_half_width_range().maximum)
 
 
 def _digest(path: Path) -> str:

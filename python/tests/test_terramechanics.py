@@ -25,6 +25,7 @@ import pytest
 from numpy.typing import NDArray
 
 from eclipse.terramechanics import (
+    InvertibleHalfWidthRange,
     CONTACT_MODELS,
     BekkerModel,
     ContactModel,
@@ -493,3 +494,89 @@ def test_bekker_refuses_a_half_width_that_overflows_the_modulus() -> None:
         pytest.raises(DegenerateContactModelError, match="finite and positive"),
     ):
         instance.pressure(sinkage=0.05, contact_half_width=1e-320)
+
+
+# The modulus k_c/b + k_phi (Bekker) or k_c + b*k_phi (Reece) is monotone in
+# half-width, so it crosses zero at most once. Which side survives depends on
+# the signs of the two terms, and both campaigns in the repository land on a
+# different side: KLS-1 is bounded below, GRC-1 above.
+
+
+@pytest.mark.parametrize("model_id", sorted(CONTACT_MODELS))
+def test_opposite_signs_bound_the_range_at_one_end_each(model_id: str) -> None:
+    build = CONTACT_MODELS[model_id]
+    bounded_below = build(
+        cohesive_modulus=-44.0, frictional_modulus=3581.0, sinkage_exponent=1.26
+    ).invertible_half_width_range()
+    assert bounded_below.minimum == pytest.approx(44.0 / 3581.0)
+    assert bounded_below.maximum == math.inf
+
+    bounded_above = build(
+        cohesive_modulus=4096.0, frictional_modulus=-22284.0, sinkage_exponent=1.23
+    ).invertible_half_width_range()
+    assert bounded_above.minimum == 0.0
+    assert bounded_above.maximum == pytest.approx(4096.0 / 22284.0), (
+        "a positive cohesive modulus against a negative frictional one fails at "
+        "large half-widths, not small ones; reporting only a floor would call "
+        "the model valid everywhere above zero"
+    )
+
+
+@pytest.mark.parametrize("model_id", sorted(CONTACT_MODELS))
+def test_matching_signs_leave_the_range_open_or_empty(model_id: str) -> None:
+    build = CONTACT_MODELS[model_id]
+    everywhere = build(
+        cohesive_modulus=10.0, frictional_modulus=20.0, sinkage_exponent=1.0
+    ).invertible_half_width_range()
+    assert (everywhere.minimum, everywhere.maximum) == (0.0, math.inf)
+    assert not everywhere.is_empty
+
+    nowhere = build(
+        cohesive_modulus=-10.0, frictional_modulus=-20.0, sinkage_exponent=1.0
+    ).invertible_half_width_range()
+    assert nowhere.is_empty
+
+
+@pytest.mark.parametrize("model_id", sorted(CONTACT_MODELS))
+def test_the_range_agrees_with_where_pressure_actually_evaluates(
+    model_id: str,
+) -> None:
+    build = CONTACT_MODELS[model_id]
+    for cohesive, frictional in (
+        (-44.0, 3581.0),
+        (4096.0, -22284.0),
+        (10.0, 20.0),
+    ):
+        model = build(
+            cohesive_modulus=cohesive,
+            frictional_modulus=frictional,
+            sinkage_exponent=1.2,
+        )
+        span = model.invertible_half_width_range()
+        for half_width in np.geomspace(1e-4, 1e2, 60):
+            inside = span.contains(float(half_width))
+            try:
+                model.pressure(sinkage=0.01, contact_half_width=half_width)
+            except DegenerateContactModelError:
+                evaluated = False
+            else:
+                evaluated = True
+            assert evaluated == inside, (
+                f"{model_id} at b={half_width}: range says {inside} but "
+                f"pressure() {'succeeded' if evaluated else 'refused'}"
+            )
+
+
+def test_the_minimum_is_the_lower_end_of_the_range() -> None:
+    model = CONTACT_MODELS["bekker"](
+        cohesive_modulus=-44.0, frictional_modulus=3581.0, sinkage_exponent=1.26
+    )
+    assert model.minimum_invertible_half_width() == (
+        model.invertible_half_width_range().minimum
+    )
+
+
+def test_the_range_is_a_value_object() -> None:
+    assert InvertibleHalfWidthRange(0.0, 1.0) == InvertibleHalfWidthRange(0.0, 1.0)
+    with pytest.raises(AttributeError):
+        InvertibleHalfWidthRange(0.0, 1.0).minimum = 2.0  # type: ignore[misc]

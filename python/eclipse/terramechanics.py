@@ -37,6 +37,7 @@ __all__ = [
     "BekkerModel",
     "ContactModel",
     "DegenerateContactModelError",
+    "InvertibleHalfWidthRange",
     "ReeceModel",
 ]
 
@@ -52,6 +53,8 @@ class ContactModel(Protocol):
     ) -> NDArray[np.float64]: ...
 
     def minimum_invertible_half_width(self) -> float: ...
+
+    def invertible_half_width_range(self) -> InvertibleHalfWidthRange: ...
 
     def pressure(
         self, *, sinkage: ArrayLike, contact_half_width: ArrayLike
@@ -112,19 +115,43 @@ def _require_finite_positive_modulus(
             "deformation modulus must be finite and positive for pressure to "
             f"increase with sinkage; {count} of {total} contact_half_width "
             f"values violate this, the first being {first}; see "
-            "minimum_invertible_half_width()"
+            "invertible_half_width_range(), which is bounded below when the "
+            "cohesive modulus is negative and above when the frictional one is"
         )
     return deformation_modulus
 
 
-def _minimum_invertible_half_width(
+@dataclass(frozen=True, slots=True)
+class InvertibleHalfWidthRange:
+    minimum: float
+    maximum: float
+
+    @property
+    def is_empty(self) -> bool:
+        return not self.minimum < self.maximum
+
+    def contains(self, half_width: float) -> bool:
+        return self.minimum < half_width < self.maximum
+
+
+def _invertible_half_width_range(
     cohesive_modulus: float, frictional_modulus: float
-) -> float:
+) -> InvertibleHalfWidthRange:
+    # Both model forms carry a two-term modulus that is monotone in half-width,
+    # so it crosses zero at most once, and always at -cohesive/frictional. Which
+    # side of that crossing is usable depends on the signs, and a fit reports
+    # nothing about which side its own plates were on.
+    if cohesive_modulus >= 0.0 and frictional_modulus >= 0.0:
+        empty = cohesive_modulus == 0.0 and frictional_modulus == 0.0
+        return InvertibleHalfWidthRange(
+            math.inf if empty else 0.0, math.inf
+        )
+    if cohesive_modulus <= 0.0 and frictional_modulus <= 0.0:
+        return InvertibleHalfWidthRange(math.inf, math.inf)
+    boundary = -cohesive_modulus / frictional_modulus
     if frictional_modulus > 0.0:
-        return max(0.0, -cohesive_modulus / frictional_modulus)
-    if cohesive_modulus > 0.0:
-        return 0.0
-    return math.inf
+        return InvertibleHalfWidthRange(boundary, math.inf)
+    return InvertibleHalfWidthRange(0.0, boundary)
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,10 +177,13 @@ class BekkerModel:
             _as_finite_positive_half_width(contact_half_width)
         )
 
-    def minimum_invertible_half_width(self) -> float:
-        return _minimum_invertible_half_width(
+    def invertible_half_width_range(self) -> InvertibleHalfWidthRange:
+        return _invertible_half_width_range(
             self.cohesive_modulus, self.frictional_modulus
         )
+
+    def minimum_invertible_half_width(self) -> float:
+        return self.invertible_half_width_range().minimum
 
     def pressure(
         self, *, sinkage: ArrayLike, contact_half_width: ArrayLike
@@ -199,10 +229,13 @@ class ReeceModel:
             _as_finite_positive_half_width(contact_half_width)
         )
 
-    def minimum_invertible_half_width(self) -> float:
-        return _minimum_invertible_half_width(
+    def invertible_half_width_range(self) -> InvertibleHalfWidthRange:
+        return _invertible_half_width_range(
             self.cohesive_modulus, self.frictional_modulus
         )
+
+    def minimum_invertible_half_width(self) -> float:
+        return self.invertible_half_width_range().minimum
 
     def pressure(
         self, *, sinkage: ArrayLike, contact_half_width: ArrayLike

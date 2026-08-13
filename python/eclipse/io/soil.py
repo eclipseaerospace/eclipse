@@ -30,7 +30,11 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from eclipse._validation import first_violation
-from eclipse.terramechanics import CONTACT_MODELS, ContactModel
+from eclipse.terramechanics import (
+    CONTACT_MODELS,
+    ContactModel,
+    InvertibleHalfWidthRange,
+)
 
 __all__ = [
     "Apparatus",
@@ -198,6 +202,9 @@ class CalibratedContactModel:
                 "fitted range deliberately"
             )
         return array
+
+    def invertible_half_width_range(self) -> InvertibleHalfWidthRange:
+        return self.extrapolating.invertible_half_width_range()
 
     def minimum_invertible_half_width(self) -> float:
         return self.extrapolating.minimum_invertible_half_width()
