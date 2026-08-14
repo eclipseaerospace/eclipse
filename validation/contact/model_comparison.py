@@ -457,7 +457,7 @@ def build_figure(
         left.set_xlabel("exponent slope $\\beta$ fitted to data with none")
         left.set_ylabel("density")
         left.set_title(
-            "the null's specification decides the verdict",
+            f"two null specifications, {NULL_REPEAT_COUNTS[0]} repeats",
             color=INK_SECONDARY, loc="left",
         )
         left.legend(
@@ -494,7 +494,7 @@ def build_figure(
         right.set_yticks([0, 3, 6, 9, 12])
         right.set_yticklabels(["0%", "3%", "6%", "9%", "12%"])
         right.set_title(
-            "prediction on data whose truth has one exponent",
+            "held-out error, single-exponent truth",
             color=INK_SECONDARY, loc="left",
         )
         right.legend(loc="upper right")
