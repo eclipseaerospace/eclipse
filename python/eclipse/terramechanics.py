@@ -1,20 +1,32 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# eclipse.terramechanics — quasi-static pressure-sinkage contact models.
+# eclipse.terramechanics — quasi-static contact models, normal and tangential.
 #
 # Pure and array-first: no I/O, no unit conversion, no parameter loading.
-# Both models are monotone power laws in sinkage whose deformation modulus
-# depends on the contact half-width. They differ in that dependence, and in
-# whether sinkage is normalized by the half-width.
+#
+# Two families. Bekker and Reece give pressure against sinkage: both are
+# monotone power laws whose deformation modulus depends on the contact
+# half-width, differing in that dependence and in whether sinkage is normalized
+# by the half-width. Mohr-Coulomb and Janosi-Hanamoto give shear: how much a
+# patch can carry, and how far it must slide to develop it.
+#
+# The shear pair is where gravity first enters the physics. Normal stress on a
+# foot is proportional to weight, so at one sixth gravity the frictional term
+# shrinks sixfold while cohesion does not.
 #
 # Finite input yields finite output, or raises. Values outside a model's fitted
 # validity range are the loader's concern, not this layer's.
 #
 # Units are those of the fitted parameters and are never converted here. With
 # parameters as published for KLS-1, sinkage in meters yields pressure in kPa.
+# The shear models are unit-agnostic in the same way: the deformation modulus
+# and the displacement passed to it must share a length unit.
 #
 # References
 #   Bekker MG (1956) Theory of Land Locomotion. University of Michigan Press.
+#   Janosi Z, Hanamoto B (1961) The analytical determination of drawbar pull as
+#     a function of slip for tracked vehicles in deformable soils. Proceedings
+#     of the 1st International Conference on Terrain-Vehicle Systems.
 #   Reece AR (1965) Principles of soil-vehicle mechanics. Proceedings of the
 #     Institution of Mechanical Engineers: Automobile Division 180(1), 45-66.
 #   Wong JY (2001) Theory of Ground Vehicles, 3rd ed. Wiley.
@@ -38,7 +50,10 @@ __all__ = [
     "ContactModel",
     "DegenerateContactModelError",
     "InvertibleHalfWidthRange",
+    "JanosiHanamotoModel",
+    "MohrCoulombModel",
     "ReeceModel",
+    "shear_stress",
 ]
 
 
@@ -264,3 +279,97 @@ CONTACT_MODELS: Final[Mapping[str, Callable[..., ContactModel]]] = MappingProxyT
         "reece": ReeceModel,
     }
 )
+
+
+# --- shear
+#
+# The first place gravity enters. Normal stress on a foot is proportional to
+# weight, so at one sixth gravity the frictional term shrinks sixfold while
+# cohesion does not. That does not make cohesion dominant — at any stress a real
+# foot generates it stays a few percent of the total — but it does mean the
+# friction cone acquires an offset that survives at zero normal load, which is
+# qualitatively different from a pure friction cone and changes the constraint
+# structure downstream regardless of its size.
+#
+# Strength and mobilisation are separate objects because they answer separate
+# questions and are measured by separate experiments. Mohr-Coulomb says how much
+# shear a patch can carry; Janosi-Hanamoto says how far it must slide to develop
+# it. Composing them is one line and does not yet need a class.
+
+
+@dataclass(frozen=True, slots=True)
+class MohrCoulombModel:
+    cohesion: float
+    friction_angle_degrees: float
+
+    def __post_init__(self) -> None:
+        if not (math.isfinite(self.cohesion) and self.cohesion >= 0.0):
+            raise ValueError(
+                f"cohesion must be finite and non-negative, got {self.cohesion}"
+            )
+        if not (0.0 < self.friction_angle_degrees < 90.0):
+            raise ValueError(
+                "friction_angle_degrees must lie strictly between 0 and 90; at 0 "
+                "the soil carries no frictional strength and at 90 the tangent "
+                f"diverges, got {self.friction_angle_degrees}"
+            )
+
+    @property
+    def friction_coefficient(self) -> float:
+        return float(np.tan(np.radians(self.friction_angle_degrees)))
+
+    def maximum_shear_stress(self, *, normal_stress: ArrayLike) -> NDArray[np.float64]:
+        stress = _as_finite_non_negative(normal_stress, "normal_stress")
+        return np.asarray(self.cohesion + stress * self.friction_coefficient)
+
+    def cohesive_fraction(self, *, normal_stress: ArrayLike) -> NDArray[np.float64]:
+        stress = _as_finite_non_negative(normal_stress, "normal_stress")
+        return np.asarray(
+            self.cohesion / self.maximum_shear_stress(normal_stress=stress)
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class JanosiHanamotoModel:
+    shear_deformation_modulus: float
+
+    def __post_init__(self) -> None:
+        if not (
+            math.isfinite(self.shear_deformation_modulus)
+            and self.shear_deformation_modulus > 0.0
+        ):
+            raise ValueError(
+                "shear_deformation_modulus must be finite and positive; it is the "
+                "slide distance over which shear mobilises, and a non-positive "
+                f"value would develop full traction instantly, got "
+                f"{self.shear_deformation_modulus}"
+            )
+
+    def mobilised_fraction(
+        self, *, shear_displacement: ArrayLike
+    ) -> NDArray[np.float64]:
+        slide = _as_finite_non_negative(shear_displacement, "shear_displacement")
+        return np.asarray(
+            -np.expm1(-slide / self.shear_deformation_modulus)
+        )
+
+    def displacement_for_fraction(self, fraction: float) -> float:
+        if not 0.0 <= fraction < 1.0:
+            raise ValueError(
+                "fraction must lie in [0, 1); the exponential approaches full "
+                f"mobilisation only asymptotically, got {fraction}"
+            )
+        return float(-self.shear_deformation_modulus * math.log1p(-fraction))
+
+
+def shear_stress(
+    *,
+    strength: MohrCoulombModel,
+    mobilisation: JanosiHanamotoModel,
+    normal_stress: ArrayLike,
+    shear_displacement: ArrayLike,
+) -> NDArray[np.float64]:
+    return np.asarray(
+        strength.maximum_shear_stress(normal_stress=normal_stress)
+        * mobilisation.mobilised_fraction(shear_displacement=shear_displacement)
+    )
