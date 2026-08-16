@@ -115,8 +115,13 @@ def test_loaded_models_satisfy_the_contact_model_protocol(path: Path) -> None:
 @pytest.mark.parametrize("path", SOIL_PATHS, ids=_soil_id)
 def test_apparatus_exposes_the_tested_plate_half_widths(path: Path) -> None:
     for dataset in load_soil(path).datasets.values():
-        half_widths = dataset.apparatus.contact_half_widths
-        assert half_widths.size == len(dataset.apparatus.plates)
+        apparatus = dataset.apparatus
+        if apparatus is None:
+            # Measured in situ rather than with plates. Its models are covered
+            # by the verification cases the same file carries.
+            continue
+        half_widths = apparatus.contact_half_widths
+        assert half_widths.size == len(apparatus.plates)
         assert np.all(half_widths > 0.0)
 
 

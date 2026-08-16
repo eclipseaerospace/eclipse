@@ -248,24 +248,38 @@ class Material:
     producer: str
 
 
+# The bibliographic fields split by publication kind rather than being one
+# optional soup: a journal article has a volume and a DOI, a book chapter has
+# editors and a publisher, and a dataset carries whichever set its source
+# actually has. Keys outside both still fail at load, which is the point.
 @dataclass(frozen=True, slots=True)
 class Dataset:
     id: str
     title: str
     authors: tuple[str, ...]
     year: int
-    journal: str
-    volume: int
-    issue: int
-    pages: str
-    doi: str
-    license: str
     tables: tuple[str, ...]
     accessed: date
     conditions: Mapping[str, Any]
-    apparatus: Apparatus
+    apparatus: Apparatus | None
     models: Mapping[str, CalibratedContactModel]
     excluded_models: Mapping[str, str]
+    # journal article
+    journal: str | None = None
+    volume: int | None = None
+    issue: int | None = None
+    pages: str | None = None
+    doi: str | None = None
+    license: str | None = None
+    # chapter in an edited volume
+    container: str | None = None
+    editors: tuple[str, ...] | None = None
+    publisher: str | None = None
+    chapter: int | None = None
+    # supporting material that is not a fitted contact model
+    figures: tuple[str, ...] | None = None
+    relative_density: Mapping[str, Any] | None = None
+    shear_model: tuple[Mapping[str, Any], ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -275,6 +289,9 @@ class Soil:
     material: Material
     datasets: Mapping[str, Dataset]
     source_path: Path
+    # Defects and gaps found in the source, carried as data so they travel with
+    # the parameters rather than living in a comment nothing reads.
+    anomaly: tuple[Mapping[str, Any], ...] | None = None
 
 
 def _build_apparatus(table: Mapping[str, Any], context: str) -> Apparatus:
@@ -352,7 +369,12 @@ def _build_dataset(table: Mapping[str, Any], context: str) -> Dataset:
     values["authors"] = tuple(values.get("authors", ()))
     values["tables"] = tuple(values.get("tables", ()))
     values["conditions"] = MappingProxyType(dict(values.get("conditions", {})))
-    values["apparatus"] = _build_apparatus(values["apparatus"], context)
+    # A soil characterised in situ was never pressed with plates, so it carries
+    # no apparatus. That is a property of how it was measured, not an omission.
+    apparatus_table = values.get("apparatus")
+    values["apparatus"] = (
+        None if apparatus_table is None else _build_apparatus(apparatus_table, context)
+    )
     values["models"] = MappingProxyType(models)
     values["excluded_models"] = MappingProxyType(excluded)
     return _construct(Dataset, values, context)

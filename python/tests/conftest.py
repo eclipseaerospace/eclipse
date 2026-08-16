@@ -65,7 +65,9 @@ def published_models() -> Mapping[str, CalibratedContactModel]:
 @pytest.fixture(scope="session")
 def tested_half_widths() -> np.ndarray:
     dataset = load_soil(REFERENCE_SOIL_PATH).datasets["lim2021"]
-    return dataset.apparatus.contact_half_widths
+    apparatus = dataset.apparatus
+    assert apparatus is not None, "the reference soil is a plate campaign"
+    return apparatus.contact_half_widths
 
 
 def observations_from(

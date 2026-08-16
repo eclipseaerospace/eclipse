@@ -643,6 +643,12 @@ def run_kls1(arguments: argparse.Namespace, parser: argparse.ArgumentParser) -> 
         model_id: dataset.models[model_id]
         for model_id in (REFERENCE_MODEL, COMPARED_MODEL)
     }
+    if dataset.apparatus is None:
+        parser.error(
+            f"{arguments.soil} records no plate apparatus, so there are no plate "
+            "sizes to draw. A soil measured in situ is not a bevameter campaign "
+            "and this runner has nothing to calibrate against"
+        )
     half_widths = [plate.contact_half_width_m for plate in dataset.apparatus.plates]
 
     series: PressureSinkageSeries | None = None

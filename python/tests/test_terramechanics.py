@@ -104,7 +104,15 @@ def _discover() -> tuple[list[DatasetUnderTest], list[ModelUnderTest]]:
     for path in sorted(SOIL_DIRECTORY.glob("*.toml")):
         soil = tomllib.loads(path.read_text(encoding="utf-8"))
         for dataset in soil["dataset"]:
-            plates = tuple(dataset["apparatus"]["plates"])
+            # A soil characterised in situ has no plate apparatus, because
+            # nobody pressed plates into it. Its models are exercised by the
+            # tests that read its own verification cases; the plate-parametrised
+            # ones below have nothing to sweep over and are skipped rather than
+            # given a fabricated geometry.
+            apparatus = dataset.get("apparatus")
+            if apparatus is None or "plates" not in apparatus:
+                continue
+            plates = tuple(apparatus["plates"])
             datasets.append(
                 DatasetUnderTest(
                     soil_id=soil["id"],

@@ -99,6 +99,35 @@ def _parameters(specification: Mapping[str, Any]) -> dict[str, float]:
     }
 
 
+def _plates_or_validity_span(
+    dataset: Mapping[str, Any]
+) -> Sequence[Mapping[str, float]]:
+    """Half-widths to generate cases at.
+
+    A plate campaign supplies them directly. A soil measured in situ has no
+    plates, so the ends and middle of its own declared half-width validity range
+    are used instead: the corners are where a wrong parameter shows first.
+    """
+    apparatus = dataset.get("apparatus")
+    if apparatus is not None and "plates" in apparatus:
+        return list(apparatus["plates"])
+    spans = {
+        model["id"]: model["validity"]["contact_half_width"]
+        for model in dataset["model"]
+        if "validity" in model
+    }
+    if not spans:
+        return []
+    span = next(iter(spans.values()))
+    low, high = float(span["min"]), float(span["max"])
+    low = high / 8.0 if low <= 0.0 else low
+    return [
+        {"contact_half_width_m": low},
+        {"contact_half_width_m": 0.5 * (low + high)},
+        {"contact_half_width_m": high},
+    ]
+
+
 def _generate_cases(
     specification: Mapping[str, Any], plates: Sequence[Mapping[str, float]]
 ) -> list[VerificationCase]:
@@ -192,7 +221,7 @@ def _write_soil(path: Path, table: Mapping[str, Any], text: str) -> list[ModelRe
     generated: dict[str, list[VerificationCase]] = {}
     missing_block: list[str] = []
     for dataset in table["dataset"]:
-        plates = dataset["apparatus"]["plates"]
+        plates = _plates_or_validity_span(dataset)
         for specification in dataset["model"]:
             model_id = specification["id"]
             if specification["status"] != VERIFIED_STATUS:
