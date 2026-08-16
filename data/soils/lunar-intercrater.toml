@@ -1,0 +1,255 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Lunar regolith, intercrater areas — in-situ measured properties.
+#
+# This is not a simulant. Every value here comes from measurements made on the
+# Moon: astronaut bootprints, Apollo penetrometers, Lunokhod cone and vane
+# tests. That matters for how the file is used. At foot scale the Moon is the
+# better-characterised body — cohesion from 327 in-situ tests at plus or minus
+# seventeen percent, relative density from 776 bootprints, and a bearing model
+# that reproduces the observations it was derived from. A simulant campaign is
+# the uncertain proxy for this, not the other way round.
+#
+# The scope is narrow and the limit is the point. These parameters come from
+# quasi-static normal loading — pressing, not walking. They say nothing about
+# shear mobilisation under gait, slip, or repeated loading, which is where
+# simulant campaigns and grain-resolved simulation remain necessary.
+#
+# Two defects in the source table are recorded under [[anomaly]]. One the
+# Sourcebook flags itself; the other it does not.
+#
+# Transcribed as published: no unit conversion, no sign correction, no
+# inference. Where a value appears in two published forms, both are recorded
+# with their own citation rather than one being converted into the other.
+
+schema_version = 1
+id             = "lunar-intercrater"
+
+[material]
+name         = "Lunar regolith, intercrater areas"
+short_name   = "lunar-intercrater"
+kind         = "in_situ_regolith"
+analogue_for = "itself"
+fidelity     = "measured_in_situ"
+producer     = "the Moon"
+
+
+[[dataset]]
+id       = "carrier1991"
+title    = "Physical Properties of the Lunar Surface"
+authors  = ["Carrier WD III", "Olhoeft GR", "Mendell W"]
+container = "Lunar Sourcebook: A User's Guide to the Moon"
+editors  = ["Heiken GH", "Vaniman DT", "French BM"]
+publisher = "Cambridge University Press"
+year     = 1991
+chapter  = 9
+tables   = ["Table 9.8", "Table 9.12", "Table 9.14"]
+figures  = ["Figure 9.20"]
+accessed = 2026-08-11
+
+[dataset.conditions]
+gravity              = { value = 1.625, units = "m/s^2" }
+atmosphere           = "vacuum"
+temperature          = "lunar_surface_diurnal"
+terrain              = "intercrater"
+measurement_methods  = [
+  "astronaut bootprint depth",
+  "Apollo self-recording penetrometer",
+  "Lunokhod cone penetrometer and vane shear",
+]
+
+# Relative density is depth-averaged and the published resolution stops at
+# 0-15 cm. The prose is explicit that the top few centimetres are looser than
+# that average, but no number is given for them, so the state a foot at four to
+# eight millimetres of sinkage actually engages is not resolved by these data.
+[dataset.relative_density]
+source = "Table 9.8, Figure 9.20"
+by_depth = [
+  { depth_range_cm = "0-15",  value = 65, sigma = 3,  units = "percent", description = "medium to dense" },
+  { depth_range_cm = "0-30",  value = 74, sigma = 3,  units = "percent", description = "dense" },
+  { depth_range_cm = "30-60", value = 92, sigma = 3,  units = "percent", description = "very dense" },
+  { depth_range_cm = "0-60",  value = 83, sigma = 3,  units = "percent", description = "dense" },
+]
+bootprint_intercrater = { value = 66, sigma = 10, units = "percent", observations = 687 }
+bootprint_crater_rim  = { value = 56, sigma = 17, units = "percent", observations = 89 }
+bootprint_combined    = { value = 65, sigma = 10, units = "percent", observations = 776 }
+shallowest_published_resolution_cm = 15
+
+
+# --- Bekker (1956), from Table 9.14
+#
+# Published in two forms. The Sourcebook prints N/cm units; Oravec (2009)
+# Table 5.8 republishes the same parameters in SI. Both are recorded with their
+# own citation, and the SI form is what the model is constructed from, so no
+# conversion is performed here. That the two reconcile is itself a check and is
+# recorded under verification.
+
+[[dataset.model]]
+id         = "bekker"
+status     = "verified"
+fit_method = "in_situ_bearing_observations"
+source     = "Table 9.14"
+
+[dataset.model.parameters]
+sinkage_exponent   = { value =   1.0, units = "1",          sigma = nan }
+cohesive_modulus   = { value =   1.4, units = "kN/m^(n+1)", sigma = nan }
+frictional_modulus = { value = 820.0, units = "kN/m^(n+2)", sigma = nan }
+
+[dataset.model.as_printed]
+citation           = "Heiken et al. (1991) Table 9.14"
+sinkage_exponent   = { value = 1.0,  units = "1" }
+cohesive_modulus   = { value = 0.14, units = "N/cm^(n+2)", printed_unit_is_wrong = true }
+frictional_modulus = { value = 0.82, units = "N/cm^3" }
+si_citation        = "Oravec (2009) Table 5.8"
+
+[dataset.model.validity]
+contact_half_width = { min = 0.0,  max = 0.25,  units = "m" }
+sinkage            = { min = 0.0,  max = 0.020, units = "m" }
+gravity            = { min = 1.625, max = 1.625, units = "m/s^2" }
+
+# Both moduli are positive, so the deformation modulus is positive at every
+# half-width and there is no invertibility bound. Every simulant fit examined in
+# this repository has one.
+[dataset.model.verification]
+cases = [
+  { contact_half_width_m = 0.03125, sinkage_m = 0.005, pressure_kPa = 4.324, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.03125, sinkage_m = 0.01, pressure_kPa = 8.648, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.03125, sinkage_m = 0.015, pressure_kPa = 12.972, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.03125, sinkage_m = 0.02, pressure_kPa = 17.296, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.140625, sinkage_m = 0.005, pressure_kPa = 4.149777777777778, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.140625, sinkage_m = 0.01, pressure_kPa = 8.299555555555555, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.140625, sinkage_m = 0.015, pressure_kPa = 12.449333333333332, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.140625, sinkage_m = 0.02, pressure_kPa = 16.59911111111111, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.25, sinkage_m = 0.005, pressure_kPa = 4.128, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.25, sinkage_m = 0.01, pressure_kPa = 8.256, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.25, sinkage_m = 0.015, pressure_kPa = 12.384, rel_tol = 1e-09 },
+  { contact_half_width_m = 0.25, sinkage_m = 0.02, pressure_kPa = 16.512, rel_tol = 1e-09 },
+]
+
+# An independent check on the same observations. The Sourcebook derives a
+# modulus of subgrade reaction from the bootprint dataset, recommended for
+# footings narrower than about 0.5 m, and gives an average of 8 kPa/cm. Applied
+# to a 20 mm half-width foot the Bekker parameters above sit 11 percent high of
+# it at every sinkage, a constant offset rather than a divergence. Two
+# derivations from one dataset agreeing to a tenth is the strongest
+# known-answer test any soil file in this repository carries.
+[dataset.model.independent_check]
+quantity                 = "modulus of subgrade reaction"
+value                    = 8.0
+units                    = "kPa/cm"
+applicable_footing_width = { max = 0.5, units = "m" }
+source                   = "Heiken et al. (1991) section 9.1.9"
+ratio_bekker_to_subgrade = 1.11
+constant_across_sinkage  = true
+
+
+# --- Mohr-Coulomb, from Table 9.12
+#
+# Cohesion and friction angle both rise with depth because both track relative
+# density. A foot engages the shallowest row.
+
+[[dataset.shear_model]]
+id         = "mohr_coulomb"
+status     = "verified"
+fit_method = "in_situ_shear_observations"
+source     = "Table 9.12"
+
+[dataset.shear_model.parameters]
+cohesion       = { value = 0.52, units = "kPa",     sigma = nan }
+friction_angle = { value = 42.0, units = "degrees", sigma = nan }
+
+[dataset.shear_model.by_depth]
+rows = [
+  { depth_range_cm = "0-15",  cohesion_kPa = 0.52, cohesion_min_kPa = 0.44, cohesion_max_kPa = 0.62, friction_angle_deg = 42.0, friction_angle_min_deg = 41.0, friction_angle_max_deg = 43.0 },
+  { depth_range_cm = "0-30",  cohesion_kPa = 0.90, cohesion_min_kPa = 0.74, cohesion_max_kPa = 1.10, friction_angle_deg = 46.0, friction_angle_min_deg = 44.0, friction_angle_max_deg = 47.0 },
+  { depth_range_cm = "30-60", cohesion_kPa = 3.00, cohesion_min_kPa = 2.40, cohesion_max_kPa = 3.80, friction_angle_deg = 54.0, friction_angle_min_deg = 52.0, friction_angle_max_deg = 55.0 },
+  { depth_range_cm = "0-60",  cohesion_kPa = 1.60, cohesion_min_kPa = 1.30, cohesion_max_kPa = 1.90, friction_angle_deg = 49.0, friction_angle_min_deg = 48.0, friction_angle_max_deg = 51.0 },
+]
+
+# Table 9.14 also carries a Mohr-Coulomb pair, from a different derivation and
+# markedly lower than Table 9.12's shallowest row. Recorded rather than
+# reconciled: the two are not the same estimate and averaging them would
+# describe a soil that exists nowhere.
+[dataset.shear_model.alternative]
+source         = "Table 9.14"
+cohesion       = { value = 0.017, units = "N/cm^2" }
+friction_angle = { value = 35.0,  units = "degrees" }
+
+
+# --- Janosi-Hanamoto (1961), from Table 9.14
+
+[[dataset.shear_model]]
+id         = "janosi_hanamoto"
+status     = "verified"
+fit_method = "in_situ_slip_observations"
+source     = "Table 9.14"
+
+[dataset.shear_model.parameters]
+shear_deformation_modulus = { value = 1.8, units = "cm", sigma = nan }
+
+# Traction is mobilised over a slide distance, not instantly. At K = 1.8 cm a
+# contact patch reaches 63 percent of peak shear at 18 mm of slip and 95 percent
+# at 54 mm. For a quadruped taking a 300 mm step that is 6 to 18 percent of the
+# stride spent developing traction, which is a direct term in cost of transport.
+[dataset.shear_model.mobilisation]
+fraction_at_one_K     = 0.632
+fraction_at_three_K   = 0.950
+slide_at_63_percent_mm = 18.0
+slide_at_95_percent_mm = 54.0
+
+
+# --- defects in the source
+
+[[anomaly]]
+id     = "flagged_unit_conversion"
+status = "acknowledged_by_source"
+detail = """
+Table 9.14 carries a footnote on the cohesive modulus and the shear deformation
+modulus: "Incorrectly converted from English to SI units in Mitchell et al.
+(1973a, 1974)." The Sourcebook flags the defect in the values it is itself
+reprinting. Both parameters are recorded as printed; neither is corrected here,
+because the correct value is not stated anywhere and guessing at one would be
+inference.
+"""
+
+[[anomaly]]
+id     = "printed_exponent_dimensionally_wrong"
+status = "confirmed"
+detail = """
+Table 9.14 prints the cohesive modulus as 0.14 N/cm^(n+2). At n = 1 that is
+N/cm^3, which converts to 140 kN/m^3. Oravec (2009) Table 5.8 reads the same
+parameter as 1.4 kN/m^(n+1), which requires the printed unit to be N/cm^(n+1),
+i.e. N/cm^2. Dimensional analysis agrees with Oravec: in p = (k_c/b + k_phi)z^n
+the cohesive modulus must carry one more length in the denominator than the
+frictional one, so N/cm^(n+1) is correct and the printed n+2 is not. This is a
+separate defect from the flagged conversion error above and the Sourcebook does
+not mark it.
+"""
+
+[[anomaly]]
+id     = "surface_density_unresolved"
+status = "gap_deferred"
+detail = """
+Relative density is published here as depth averages with 0-15 cm as the
+shallowest resolution. The text states that the top few centimetres are looser
+than that average and that density rises quickly below 10 cm, but gives no value
+for the shallow layer. A foot sinking four to eight millimetres engages only
+that unresolved layer, so the density state governing foot contact is not
+determined by these data.
+
+This is a gap in this source rather than in the record. The Sourcebook is a 1991
+synthesis of primary data that resolves depth continuously, and that primary
+data is reachable. It is deferred rather than pursued because nothing currently
+depends on it: the Bekker set above is already validated at foot scale against
+bootprints without passing through density, and the gap bounds only how strongly
+a simulant-versus-Moon density comparison can be stated, which is a claim about
+a simulant's relevance rather than an input to a mission study.
+"""
+resolved_by = [
+  "Mitchell et al., Apollo 15/16/17 Preliminary Science Reports, Soil Mechanics: self-recording penetrometer traces give cone resistance against depth continuously, and are the data Carrier averaged. Apollo 16 is NASA document 19730013002, section 8.",
+  "Mitchell et al., Apollo Soil Mechanics Experiment S-200 final report, NASA-CR-134306.",
+  "Slyuta EN, Physical and mechanical properties of the lunar soil, Solar System Research: English review of the Lunokhod PROP penetrometer campaign.",
+  "Chang'e-3 and Chang'e-4 Lunar Penetrating Radar, and Yutu wheel-sinkage analyses: post-2013 surface-layer estimates, newer than anything in the 1991 synthesis.",
+]
+trigger = "needed when specifying the target density of a physical campaign, not before"
+
