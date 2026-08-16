@@ -63,6 +63,9 @@ class DegenerateContactModelError(ValueError):
 
 @runtime_checkable
 class ContactModel(Protocol):
+    @property
+    def sinkage_exponent(self) -> float: ...
+
     def deformation_modulus(
         self, contact_half_width: ArrayLike
     ) -> NDArray[np.float64]: ...
@@ -291,7 +294,7 @@ CONTACT_MODELS: Final[Mapping[str, Callable[..., ContactModel]]] = MappingProxyT
 # qualitatively different from a pure friction cone and changes the constraint
 # structure downstream regardless of its size.
 #
-# Strength and mobilisation are separate objects because they answer separate
+# Strength and mobilization are separate objects because they answer separate
 # questions and are measured by separate experiments. Mohr-Coulomb says how much
 # shear a patch can carry; Janosi-Hanamoto says how far it must slide to develop
 # it. Composing them is one line and does not yet need a class.
@@ -340,12 +343,12 @@ class JanosiHanamotoModel:
         ):
             raise ValueError(
                 "shear_deformation_modulus must be finite and positive; it is the "
-                "slide distance over which shear mobilises, and a non-positive "
+                "slide distance over which shear mobilizes, and a non-positive "
                 f"value would develop full traction instantly, got "
                 f"{self.shear_deformation_modulus}"
             )
 
-    def mobilised_fraction(
+    def mobilized_fraction(
         self, *, shear_displacement: ArrayLike
     ) -> NDArray[np.float64]:
         slide = _as_finite_non_negative(shear_displacement, "shear_displacement")
@@ -357,7 +360,7 @@ class JanosiHanamotoModel:
         if not 0.0 <= fraction < 1.0:
             raise ValueError(
                 "fraction must lie in [0, 1); the exponential approaches full "
-                f"mobilisation only asymptotically, got {fraction}"
+                f"mobilization only asymptotically, got {fraction}"
             )
         return float(-self.shear_deformation_modulus * math.log1p(-fraction))
 
@@ -365,11 +368,11 @@ class JanosiHanamotoModel:
 def shear_stress(
     *,
     strength: MohrCoulombModel,
-    mobilisation: JanosiHanamotoModel,
+    mobilization: JanosiHanamotoModel,
     normal_stress: ArrayLike,
     shear_displacement: ArrayLike,
 ) -> NDArray[np.float64]:
     return np.asarray(
         strength.maximum_shear_stress(normal_stress=normal_stress)
-        * mobilisation.mobilised_fraction(shear_displacement=shear_displacement)
+        * mobilization.mobilized_fraction(shear_displacement=shear_displacement)
     )

@@ -179,6 +179,10 @@ class CalibratedContactModel:
     extrapolating: ContactModel
 
     @property
+    def sinkage_exponent(self) -> float:
+        return self.extrapolating.sinkage_exponent
+
+    @property
     def contact_half_width_validity(self) -> ValidityRange:
         return self.validity["contact_half_width"]
 

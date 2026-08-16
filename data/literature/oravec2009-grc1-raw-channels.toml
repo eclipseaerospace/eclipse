@@ -64,7 +64,7 @@ plates = [
 # September 2007 column reads 1170.2 and 1126.3 and belongs to earlier
 # campaigns. Units are as printed: the displacement constant is annotated
 # "mm*V" here and "mm/V" in the code of an earlier listing, while the
-# arithmetic in every listing treats it as millimetres per volt per volt.
+# arithmetic in every listing treats it as millimeters per volt per volt.
 [calibration]
 source       = "Table 5.1, February 2008"
 load_cell    = { value = 1155.1, units = "N/(mV/V)" }

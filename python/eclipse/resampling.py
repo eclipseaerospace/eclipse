@@ -21,7 +21,7 @@
 # against rather than being silently clamped here.
 #
 # Deviation is the sample standard deviation, over repeats at each grid point,
-# normalised by one less than the count. A population deviation would
+# normalized by one less than the count. A population deviation would
 # understate the scatter of a handful of runs.
 
 from __future__ import annotations

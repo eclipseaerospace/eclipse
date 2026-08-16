@@ -3,7 +3,7 @@
 # Tests for the shear models in eclipse.terramechanics.
 #
 # Expected values are read from data/soils/lunar-intercrater.toml rather than
-# written here, so adding a soil adds its own cases. The mobilisation distances
+# written here, so adding a soil adds its own cases. The mobilization distances
 # recorded in that file are the ones a gait analysis will consume, and they are
 # checked against the model rather than against a comment.
 
@@ -93,10 +93,10 @@ def test_friction_angle_carries_more_uncertainty_than_cohesion() -> None:
     )
 
 
-def test_mobilisation_reaches_the_recorded_fractions_at_the_recorded_distances() -> None:
+def test_mobilization_reaches_the_recorded_fractions_at_the_recorded_distances() -> None:
     model = _models()["janosi_hanamoto"]
     modulus_cm = model["parameters"]["shear_deformation_modulus"]["value"]
-    recorded = model["mobilisation"]
+    recorded = model["mobilization"]
     janosi = JanosiHanamotoModel(shear_deformation_modulus=modulus_cm * 10.0)
 
     for distance_key, fraction_key in (
@@ -104,59 +104,59 @@ def test_mobilisation_reaches_the_recorded_fractions_at_the_recorded_distances()
         ("slide_at_95_percent_mm", "fraction_at_three_K"),
     ):
         reached = float(
-            janosi.mobilised_fraction(shear_displacement=recorded[distance_key])
+            janosi.mobilized_fraction(shear_displacement=recorded[distance_key])
         )
         assert reached == pytest.approx(recorded[fraction_key], abs=5e-3), (
-            f"{distance_key} should mobilise {recorded[fraction_key]}, got {reached}"
+            f"{distance_key} should mobilize {recorded[fraction_key]}, got {reached}"
         )
 
 
 def test_one_and_three_moduli_give_the_canonical_fractions() -> None:
     janosi = JanosiHanamotoModel(shear_deformation_modulus=18.0)
     assert float(
-        janosi.mobilised_fraction(shear_displacement=18.0)
+        janosi.mobilized_fraction(shear_displacement=18.0)
     ) == pytest.approx(1.0 - math.exp(-1.0))
     assert float(
-        janosi.mobilised_fraction(shear_displacement=54.0)
+        janosi.mobilized_fraction(shear_displacement=54.0)
     ) == pytest.approx(1.0 - math.exp(-3.0))
 
 
-def test_displacement_for_fraction_inverts_mobilised_fraction() -> None:
+def test_displacement_for_fraction_inverts_mobilized_fraction() -> None:
     janosi = JanosiHanamotoModel(shear_deformation_modulus=18.0)
     for fraction in (0.0, 0.25, 0.632, 0.95, 0.999):
         distance = janosi.displacement_for_fraction(fraction)
         assert float(
-            janosi.mobilised_fraction(shear_displacement=distance)
+            janosi.mobilized_fraction(shear_displacement=distance)
         ) == pytest.approx(fraction, abs=1e-12)
 
 
-def test_mobilisation_is_zero_at_no_slide_and_rises_without_exceeding_one() -> None:
+def test_mobilization_is_zero_at_no_slide_and_rises_without_exceeding_one() -> None:
     modulus = 18.0
     janosi = JanosiHanamotoModel(shear_deformation_modulus=modulus)
-    assert float(janosi.mobilised_fraction(shear_displacement=0.0)) == 0.0
+    assert float(janosi.mobilized_fraction(shear_displacement=0.0)) == 0.0
 
     # Strictly below one over the range a gait actually visits. Further out the
     # exponential underflows and the fraction saturates at exactly 1.0, which is
     # correct double-precision behaviour rather than a defect: the asymptote is
     # mathematical and is not representable.
     within_reach = np.array([0.0, 0.5, 1.0, 3.0, 6.0]) * modulus
-    fractions = janosi.mobilised_fraction(shear_displacement=within_reach)
+    fractions = janosi.mobilized_fraction(shear_displacement=within_reach)
     assert np.all(np.diff(fractions) > 0.0)
     assert np.all(fractions < 1.0)
 
-    saturated = janosi.mobilised_fraction(shear_displacement=100.0 * modulus)
+    saturated = janosi.mobilized_fraction(shear_displacement=100.0 * modulus)
     assert float(saturated) == 1.0
     assert np.all(
-        janosi.mobilised_fraction(shear_displacement=np.array([1e3, 1e9]) * modulus)
+        janosi.mobilized_fraction(shear_displacement=np.array([1e3, 1e9]) * modulus)
         <= 1.0
     ), "the fraction is a probability-like quantity and must never exceed one"
 
 
-def test_shear_stress_composes_strength_with_mobilisation() -> None:
+def test_shear_stress_composes_strength_with_mobilization() -> None:
     strength = _strength_at("0-15")
     janosi = JanosiHanamotoModel(shear_deformation_modulus=18.0)
     carried = shear_stress(
-        strength=strength, mobilisation=janosi,
+        strength=strength, mobilization=janosi,
         normal_stress=16.3, shear_displacement=18.0,
     )
     expected = float(
@@ -184,7 +184,7 @@ def test_an_unusable_deformation_modulus_is_refused(modulus: float) -> None:
 
 
 @pytest.mark.parametrize("fraction", [-0.1, 1.0, 1.5])
-def test_asking_for_full_mobilisation_is_refused(fraction: float) -> None:
+def test_asking_for_full_mobilization_is_refused(fraction: float) -> None:
     with pytest.raises(ValueError, match=r"lie in \[0, 1\)"):
         JanosiHanamotoModel(shear_deformation_modulus=18.0).displacement_for_fraction(
             fraction
@@ -198,7 +198,7 @@ def test_negative_or_non_finite_inputs_are_refused(bad: float) -> None:
     with pytest.raises(ValueError, match="normal_stress must be finite"):
         strength.maximum_shear_stress(normal_stress=[1.0, bad])
     with pytest.raises(ValueError, match="shear_displacement must be finite"):
-        janosi.mobilised_fraction(shear_displacement=[1.0, bad])
+        janosi.mobilized_fraction(shear_displacement=[1.0, bad])
 
 
 def test_the_models_are_value_objects() -> None:

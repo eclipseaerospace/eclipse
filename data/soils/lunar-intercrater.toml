@@ -12,7 +12,7 @@
 #
 # The scope is narrow and the limit is the point. These parameters come from
 # quasi-static normal loading — pressing, not walking. They say nothing about
-# shear mobilisation under gait, slip, or repeated loading, which is where
+# shear mobilization under gait, slip, or repeated loading, which is where
 # simulant campaigns and grain-resolved simulation remain necessary.
 #
 # Two defects in the source table are recorded under [[anomaly]]. One the
@@ -59,9 +59,9 @@ measurement_methods  = [
 ]
 
 # Relative density is depth-averaged and the published resolution stops at
-# 0-15 cm. The prose is explicit that the top few centimetres are looser than
+# 0-15 cm. The prose is explicit that the top few centimeters are looser than
 # that average, but no number is given for them, so the state a foot at four to
-# eight millimetres of sinkage actually engages is not resolved by these data.
+# eight millimeters of sinkage actually engages is not resolved by these data.
 [dataset.relative_density]
 source = "Table 9.8, Figure 9.20"
 by_depth = [
@@ -187,11 +187,11 @@ source     = "Table 9.14"
 [dataset.shear_model.parameters]
 shear_deformation_modulus = { value = 1.8, units = "cm", sigma = nan }
 
-# Traction is mobilised over a slide distance, not instantly. At K = 1.8 cm a
+# Traction is mobilized over a slide distance, not instantly. At K = 1.8 cm a
 # contact patch reaches 63 percent of peak shear at 18 mm of slip and 95 percent
 # at 54 mm. For a quadruped taking a 300 mm step that is 6 to 18 percent of the
 # stride spent developing traction, which is a direct term in cost of transport.
-[dataset.shear_model.mobilisation]
+[dataset.shear_model.mobilization]
 fraction_at_one_K     = 0.632
 fraction_at_three_K   = 0.950
 slide_at_63_percent_mm = 18.0
@@ -231,9 +231,9 @@ id     = "surface_density_unresolved"
 status = "gap_deferred"
 detail = """
 Relative density is published here as depth averages with 0-15 cm as the
-shallowest resolution. The text states that the top few centimetres are looser
+shallowest resolution. The text states that the top few centimeters are looser
 than that average and that density rises quickly below 10 cm, but gives no value
-for the shallow layer. A foot sinking four to eight millimetres engages only
+for the shallow layer. A foot sinking four to eight millimeters engages only
 that unresolved layer, so the density state governing foot contact is not
 determined by these data.
 
