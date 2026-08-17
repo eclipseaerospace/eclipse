@@ -3,10 +3,13 @@
 # eclipse.analysis.style — the figure palette and the rc settings every runner
 # shares.
 #
-# Six runners had grown their own copy of this block. What varied between them
-# was only figure size and subplot geometry, which are per-figure decisions; the
-# palette and everything else were identical, and drifting them apart by editing
-# one copy would have been silent.
+# Six runners had grown their own copy of this block, and one of them had
+# already found the split below on its own: a base of everything invariant, with
+# a per-figure layer over it. The base here is exactly the intersection of the
+# six, no wider. Type sizes look invariant and are not -- three runners set tick
+# labels at 8.5 and three at 9.0 -- so they stay in the per-figure layer where
+# they were, rather than being averaged into a default that silently redraws
+# half the figures.
 #
 # No matplotlib import. The style is a plain mapping handed to rc_context by the
 # caller, so the library stays a pure numpy dependency and only the runners,
@@ -53,16 +56,11 @@ BASE_STYLE: Final[Mapping[str, Any]] = MappingProxyType(
         "axes.labelcolor": INK_SECONDARY,
         "axes.linewidth": 0.8,
         "axes.grid": True,
-        "axes.titlesize": 9.5,
         "grid.color": GRID,
         "grid.linewidth": 0.6,
         "xtick.color": INK_SECONDARY,
         "ytick.color": INK_SECONDARY,
-        "xtick.labelsize": 8.5,
-        "ytick.labelsize": 8.5,
-        "font.size": 9.5,
         "legend.frameon": False,
-        "legend.fontsize": 8.0,
         "savefig.facecolor": SURFACE,
     }
 )

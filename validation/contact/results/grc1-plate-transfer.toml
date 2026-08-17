@@ -13,7 +13,7 @@ estimator = "averaged_exponent"
 
 [inputs]
 channels_manifest = "data/literature/oravec2009-grc1-raw-channels.toml"
-channels_manifest_sha256 = "926295b5975120731b689e208ec4a3c08d609f4bf070c94f9c7886d40d74f4ea"
+channels_manifest_sha256 = "110903fdc87502aa84bd7559346e4b1b3dbc1657dc52c7997723fa21393e86eb"
 channels_series = "data/literature/oravec2009-grc1-raw-channels.csv"
 channels_series_sha256 = "953c174a96394a5bcd5acfb47da3e40b6f8a77e196b9f7fabffdb809f4b7a484"
 

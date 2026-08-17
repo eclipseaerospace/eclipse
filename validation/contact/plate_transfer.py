@@ -64,6 +64,12 @@ from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from numpy.typing import NDArray
 
+from eclipse.analysis.style import (
+    INK_MUTED,
+    INK_PRIMARY,
+    INK_SECONDARY,
+    figure_style,
+)
 from eclipse.fitting import (
     FittedContactModel,
     PressureSinkageObservations,
@@ -100,38 +106,23 @@ CURVE_SAMPLES: Final = 300
 PLATE_MARKERS: Final = ("o", "^", "s")
 OBSERVED_COLOR: Final = "#52514e"
 PREDICTED_COLOR: Final = "#d4570a"
-INK_PRIMARY: Final = "#0b0b0b"
-INK_SECONDARY: Final = "#52514e"
-INK_MUTED: Final = "#8a8880"
-SURFACE: Final = "#fcfcfb"
 MARKER: Final = (3.4, 0.8)
 
-FIGURE_STYLE: Final[dict[str, Any]] = {
-    "figure.figsize": (10.6, 5.0),
-    "figure.dpi": 200,
-    "figure.facecolor": SURFACE,
-    "axes.facecolor": SURFACE,
-    "axes.edgecolor": INK_MUTED,
-    "axes.labelcolor": INK_SECONDARY,
-    "axes.linewidth": 0.8,
-    "axes.grid": True,
-    "axes.titlesize": 9.5,
-    "grid.color": "#e6e5e0",
-    "grid.linewidth": 0.6,
-    "xtick.color": INK_SECONDARY,
-    "ytick.color": INK_SECONDARY,
-    "xtick.labelsize": 8.5,
-    "ytick.labelsize": 8.5,
-    "font.size": 9.5,
-    "legend.frameon": False,
-    "legend.fontsize": 8.0,
-    "savefig.facecolor": SURFACE,
-    "figure.subplot.top": 0.718,
-    "figure.subplot.bottom": 0.250,
-    "figure.subplot.left": 0.058,
-    "figure.subplot.right": 0.986,
-    "figure.subplot.wspace": 0.200,
-}
+FIGURE_STYLE: Final[dict[str, Any]] = figure_style(
+    {
+        "figure.figsize": (10.6, 5.0),
+        "axes.titlesize": 9.5,
+        "xtick.labelsize": 8.5,
+        "ytick.labelsize": 8.5,
+        "font.size": 9.5,
+        "legend.fontsize": 8.0,
+        "figure.subplot.top": 0.718,
+        "figure.subplot.bottom": 0.250,
+        "figure.subplot.left": 0.058,
+        "figure.subplot.right": 0.986,
+        "figure.subplot.wspace": 0.200,
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)

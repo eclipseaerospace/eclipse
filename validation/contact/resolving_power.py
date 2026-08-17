@@ -52,6 +52,14 @@ from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from numpy.typing import NDArray
 
+from eclipse.analysis.style import (
+    ACCENT_PRIMARY,
+    ACCENT_SECONDARY,
+    INK_MUTED,
+    INK_PRIMARY,
+    INK_SECONDARY,
+    figure_style,
+)
 from eclipse.fitting import (
     PressureSinkageObservations,
     fit_averaged_power_law,
@@ -110,37 +118,22 @@ METRIC_LABELS: Final[dict[str, str]] = {
     "extrapolation_far": "extrapolation 1.35x, large held out",
 }
 
-INK_PRIMARY: Final = "#0b0b0b"
-INK_SECONDARY: Final = "#52514e"
-INK_MUTED: Final = "#8a8880"
-SURFACE: Final = "#fcfcfb"
-NULL_COLOR: Final = "#1f4e9c"
-OBSERVED_COLOR: Final = "#d4570a"
+NULL_COLOR: Final = ACCENT_PRIMARY
+OBSERVED_COLOR: Final = ACCENT_SECONDARY
 
-FIGURE_STYLE: Final[dict[str, Any]] = {
-    "figure.figsize": (9.8, 4.8),
-    "figure.dpi": 200,
-    "figure.facecolor": SURFACE,
-    "axes.facecolor": SURFACE,
-    "axes.edgecolor": INK_MUTED,
-    "axes.labelcolor": INK_SECONDARY,
-    "axes.linewidth": 0.8,
-    "axes.grid": True,
-    "grid.color": "#e6e5e0",
-    "grid.linewidth": 0.6,
-    "xtick.color": INK_SECONDARY,
-    "ytick.color": INK_SECONDARY,
-    "xtick.labelsize": 8.5,
-    "ytick.labelsize": 9.0,
-    "font.size": 9.5,
-    "legend.frameon": False,
-    "legend.fontsize": 8.0,
-    "savefig.facecolor": SURFACE,
-    "figure.subplot.top": 0.775,
-    "figure.subplot.bottom": 0.300,
-    "figure.subplot.left": 0.300,
-    "figure.subplot.right": 0.975,
-}
+FIGURE_STYLE: Final[dict[str, Any]] = figure_style(
+    {
+        "figure.figsize": (9.8, 4.8),
+        "xtick.labelsize": 8.5,
+        "ytick.labelsize": 9.0,
+        "font.size": 9.5,
+        "legend.fontsize": 8.0,
+        "figure.subplot.top": 0.775,
+        "figure.subplot.bottom": 0.300,
+        "figure.subplot.left": 0.300,
+        "figure.subplot.right": 0.975,
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)

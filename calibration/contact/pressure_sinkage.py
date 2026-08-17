@@ -50,6 +50,12 @@ from matplotlib.legend_handler import HandlerTuple
 from matplotlib.lines import Line2D
 from numpy.typing import NDArray
 
+from eclipse.analysis.style import (
+    INK_MUTED,
+    INK_PRIMARY,
+    INK_SECONDARY,
+    figure_style,
+)
 from eclipse.fitting import (
     DEFAULT_WEIGHTING,
     FittedContactModel,
@@ -128,28 +134,8 @@ PLATE_LINESTYLES: Final[tuple[Any, ...]] = (
     (0, (7, 2, 1.5, 2)),
 )
 PLATE_MARKERS: Final = ("o", "^", "s")
-INK_PRIMARY: Final = "#0b0b0b"
-INK_SECONDARY: Final = "#52514e"
-INK_MUTED: Final = "#8a8880"
-SURFACE: Final = "#fcfcfb"
 
-BASE_STYLE: Final[dict[str, Any]] = {
-    "figure.dpi": 200,
-    "figure.facecolor": SURFACE,
-    "axes.facecolor": SURFACE,
-    "axes.edgecolor": INK_MUTED,
-    "axes.labelcolor": INK_SECONDARY,
-    "axes.linewidth": 0.8,
-    "axes.grid": True,
-    "grid.color": "#e6e5e0",
-    "grid.linewidth": 0.6,
-    "xtick.color": INK_SECONDARY,
-    "ytick.color": INK_SECONDARY,
-    "legend.frameon": False,
-    "savefig.facecolor": SURFACE,
-}
-KLS1_STYLE: Final[dict[str, Any]] = {
-    **BASE_STYLE,
+KLS1_STYLE: Final[dict[str, Any]] = figure_style({
     "figure.figsize": (7.8, 5.4),
     "xtick.labelsize": 9,
     "ytick.labelsize": 9,
@@ -159,9 +145,8 @@ KLS1_STYLE: Final[dict[str, Any]] = {
     "figure.subplot.bottom": 0.215,
     "figure.subplot.left": 0.085,
     "figure.subplot.right": 0.965,
-}
-GRC1_STYLE: Final[dict[str, Any]] = {
-    **BASE_STYLE,
+})
+GRC1_STYLE: Final[dict[str, Any]] = figure_style({
     "figure.figsize": (10.4, 5.6),
     "axes.titlesize": 9.5,
     "xtick.labelsize": 8.5,
@@ -173,7 +158,7 @@ GRC1_STYLE: Final[dict[str, Any]] = {
     "figure.subplot.left": 0.062,
     "figure.subplot.right": 0.985,
     "figure.subplot.wspace": 0.165,
-}
+})
 KLS1_MARKER: Final = (3.4, 0.8)
 GRC1_MARKER: Final = (3.0, 0.7)
 PLATE_LEGEND_ANCHOR: Final = 0.755

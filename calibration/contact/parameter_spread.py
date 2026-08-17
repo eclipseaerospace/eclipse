@@ -47,6 +47,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.figure import Figure
 
+from eclipse.analysis.style import (
+    ACCENT_PRIMARY,
+    ACCENT_SECONDARY,
+    INK_MUTED,
+    INK_PRIMARY,
+    INK_SECONDARY,
+    figure_style,
+)
 from eclipse.fitting import (
     Estimator,
     PressureSinkageObservations,
@@ -76,36 +84,21 @@ REPORT_SCHEMA_VERSION: Final = 1
 ESTIMATORS: Final[tuple[Estimator, ...]] = ("two_stage", "averaged_exponent", "direct")
 WEIGHTINGS: Final[tuple[WeightingScheme, ...]] = ("uniform", "pressure_squared")
 
-INK_PRIMARY: Final = "#0b0b0b"
-INK_SECONDARY: Final = "#52514e"
-INK_MUTED: Final = "#8a8880"
-SURFACE: Final = "#fcfcfb"
-BAR_COLOR: Final = "#1f4e9c"
-WINDOW_COLOR: Final = "#d4570a"
+BAR_COLOR: Final = ACCENT_PRIMARY
+WINDOW_COLOR: Final = ACCENT_SECONDARY
 
-FIGURE_STYLE: Final[dict[str, Any]] = {
-    "figure.figsize": (9.6, 5.2),
-    "figure.dpi": 200,
-    "figure.facecolor": SURFACE,
-    "axes.facecolor": SURFACE,
-    "axes.edgecolor": INK_MUTED,
-    "axes.labelcolor": INK_SECONDARY,
-    "axes.linewidth": 0.8,
-    "axes.grid": True,
-    "grid.color": "#e6e5e0",
-    "grid.linewidth": 0.6,
-    "xtick.color": INK_SECONDARY,
-    "ytick.color": INK_SECONDARY,
-    "xtick.labelsize": 8.5,
-    "ytick.labelsize": 9.0,
-    "font.size": 9.5,
-    "legend.frameon": False,
-    "savefig.facecolor": SURFACE,
-    "figure.subplot.top": 0.815,
-    "figure.subplot.bottom": 0.250,
-    "figure.subplot.left": 0.345,
-    "figure.subplot.right": 0.975,
-}
+FIGURE_STYLE: Final[dict[str, Any]] = figure_style(
+    {
+        "figure.figsize": (9.6, 5.2),
+        "xtick.labelsize": 8.5,
+        "ytick.labelsize": 9.0,
+        "font.size": 9.5,
+        "figure.subplot.top": 0.815,
+        "figure.subplot.bottom": 0.250,
+        "figure.subplot.left": 0.345,
+        "figure.subplot.right": 0.975,
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)

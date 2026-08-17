@@ -68,6 +68,14 @@ from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from numpy.typing import NDArray
 
+from eclipse.analysis.style import (
+    ACCENT_PRIMARY,
+    ACCENT_SECONDARY,
+    INK_MUTED,
+    INK_PRIMARY,
+    INK_SECONDARY,
+    figure_style,
+)
 from eclipse.fitting import (
     PressureSinkageObservations,
     fit_averaged_power_law,
@@ -124,43 +132,28 @@ MODEL_LABELS: Final[dict[str, str]] = {
     "scale_aware": "scale-aware n(b)",
 }
 
-INK_PRIMARY: Final = "#0b0b0b"
-INK_SECONDARY: Final = "#52514e"
-INK_MUTED: Final = "#8a8880"
-SURFACE: Final = "#fcfcfb"
-MATCHED_COLOR: Final = "#1f4e9c"
-DESIGNED_COLOR: Final = "#8a8880"
-OBSERVED_COLOR: Final = "#d4570a"
+MATCHED_COLOR: Final = ACCENT_PRIMARY
+DESIGNED_COLOR: Final = INK_MUTED
+OBSERVED_COLOR: Final = ACCENT_SECONDARY
 MODEL_COLORS: Final[dict[str, str]] = {
-    "bekker": "#1f4e9c", "reece": "#4d8fd6", "scale_aware": "#d4570a"
+    "bekker": ACCENT_PRIMARY, "reece": "#4d8fd6", "scale_aware": ACCENT_SECONDARY
 }
 
-FIGURE_STYLE: Final[dict[str, Any]] = {
-    "figure.figsize": (10.4, 5.2),
-    "figure.dpi": 200,
-    "figure.facecolor": SURFACE,
-    "axes.facecolor": SURFACE,
-    "axes.edgecolor": INK_MUTED,
-    "axes.labelcolor": INK_SECONDARY,
-    "axes.linewidth": 0.8,
-    "axes.grid": True,
-    "axes.titlesize": 9.5,
-    "grid.color": "#e6e5e0",
-    "grid.linewidth": 0.6,
-    "xtick.color": INK_SECONDARY,
-    "ytick.color": INK_SECONDARY,
-    "xtick.labelsize": 8.5,
-    "ytick.labelsize": 8.5,
-    "font.size": 9.5,
-    "legend.frameon": False,
-    "legend.fontsize": 8.0,
-    "savefig.facecolor": SURFACE,
-    "figure.subplot.top": 0.726,
-    "figure.subplot.bottom": 0.232,
-    "figure.subplot.left": 0.062,
-    "figure.subplot.right": 0.986,
-    "figure.subplot.wspace": 0.215,
-}
+FIGURE_STYLE: Final[dict[str, Any]] = figure_style(
+    {
+        "figure.figsize": (10.4, 5.2),
+        "axes.titlesize": 9.5,
+        "xtick.labelsize": 8.5,
+        "ytick.labelsize": 8.5,
+        "font.size": 9.5,
+        "legend.fontsize": 8.0,
+        "figure.subplot.top": 0.726,
+        "figure.subplot.bottom": 0.232,
+        "figure.subplot.left": 0.062,
+        "figure.subplot.right": 0.986,
+        "figure.subplot.wspace": 0.215,
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
