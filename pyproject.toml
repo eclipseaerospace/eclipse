@@ -43,7 +43,7 @@ filterwarnings = ["error"]
 [tool.mypy]
 python_version         = "3.12"
 mypy_path              = "python"
-files                  = ["python", "tools", "calibration", "validation"]
+files                  = ["python", "tools", "calibration", "validation", "studies"]
 strict                 = true
 warn_unreachable       = true
 local_partial_types    = true
