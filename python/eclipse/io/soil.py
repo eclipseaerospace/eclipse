@@ -34,6 +34,8 @@ from eclipse.terramechanics import (
     CONTACT_MODELS,
     ContactModel,
     InvertibleHalfWidthRange,
+    JanosiHanamotoModel,
+    MohrCoulombModel,
 )
 
 __all__ = [
@@ -47,7 +49,10 @@ __all__ = [
     "Soil",
     "SoilFileError",
     "ValidityRange",
+    "cohesion_range_kPa",
+    "janosi_hanamoto_model",
     "load_soil",
+    "mohr_coulomb_model",
 ]
 
 SUPPORTED_SCHEMA_VERSIONS: Final = frozenset({1})
@@ -412,3 +417,62 @@ def load_soil(path: Path | str) -> Soil:
     values["datasets"] = MappingProxyType({dataset.id: dataset for dataset in datasets})
     values["source_path"] = source_path
     return _construct(Soil, values, context)
+
+
+# --- shear accessors
+#
+# The loader carries shear models as raw mappings because their shape is still
+# settling; one soil in this repository has them. These two accessors are where
+# the units are handled, which is the right place for it: transcription keeps a
+# published centimetre a centimetre, and conversion belongs in tested code.
+
+
+def _shear_entry(dataset: Dataset, model_id: str, context: str) -> Mapping[str, Any]:
+    if dataset.shear_model is None:
+        raise SoilFileError(f"{context}: dataset {dataset.id} carries no shear models")
+    for entry in dataset.shear_model:
+        if entry.get("id") == model_id:
+            return entry
+    raise SoilFileError(
+        f"{context}: dataset {dataset.id} carries no shear model {model_id!r}; "
+        f"it has {sorted(str(e.get('id')) for e in dataset.shear_model)}"
+    )
+
+
+def mohr_coulomb_model(dataset: Dataset, *, depth_range_cm: str) -> MohrCoulombModel:
+    entry = _shear_entry(dataset, "mohr_coulomb", "mohr_coulomb_model")
+    rows = entry["by_depth"]["rows"]
+    for row in rows:
+        if row["depth_range_cm"] == depth_range_cm:
+            return MohrCoulombModel(
+                cohesion=row["cohesion_kPa"],
+                friction_angle_degrees=row["friction_angle_deg"],
+            )
+    raise SoilFileError(
+        f"mohr_coulomb_model: dataset {dataset.id} has no depth range "
+        f"{depth_range_cm!r}; it has "
+        f"{sorted(str(row['depth_range_cm']) for row in rows)}"
+    )
+
+
+def cohesion_range_kPa(dataset: Dataset, *, depth_range_cm: str) -> tuple[float, float]:
+    entry = _shear_entry(dataset, "mohr_coulomb", "cohesion_range_kPa")
+    for row in entry["by_depth"]["rows"]:
+        if row["depth_range_cm"] == depth_range_cm:
+            return (float(row["cohesion_min_kPa"]), float(row["cohesion_max_kPa"]))
+    raise SoilFileError(
+        f"cohesion_range_kPa: dataset {dataset.id} has no depth range "
+        f"{depth_range_cm!r}"
+    )
+
+
+def janosi_hanamoto_model(dataset: Dataset) -> JanosiHanamotoModel:
+    """Build the mobilization model with its deformation modulus in meters.
+
+    The file stores the published centimetre unchanged, per the transcription
+    policy. Converting here rather than there means a wrong factor fails a test
+    instead of silently becoming the archived value.
+    """
+    entry = _shear_entry(dataset, "janosi_hanamoto", "janosi_hanamoto_model")
+    modulus_cm = entry["parameters"]["shear_deformation_modulus"]["value"]
+    return JanosiHanamotoModel(shear_deformation_modulus=float(modulus_cm) / 100.0)

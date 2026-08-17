@@ -79,6 +79,15 @@ from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 from numpy.typing import NDArray
 
+from eclipse.analysis.boundary import (
+    INSIDE,
+    OUTSIDE,
+    UNMEASURED,
+    BoundaryRow,
+    tally,
+    text_table,
+    toml_lines,
+)
 from eclipse.analysis.style import (
     ACCENT_PRIMARY,
     ACCENT_SECONDARY,
@@ -179,28 +188,6 @@ class SoilUnderFoot:
     mobilization: JanosiHanamotoModel
     sinkage_ceiling_m: float
     half_width_range_m: tuple[float, float]
-
-
-INSIDE: Final = "inside_published_range"
-OUTSIDE: Final = "outside_published_range"
-UNMEASURED: Final = "no_published_range"
-
-
-@dataclass(frozen=True, slots=True)
-class BoundaryRow:
-    """One quantity, what was published about it, and what this study asked of it.
-
-    The distinction the table exists to make is not between confident and
-    uncertain. It is between a number interpolated inside a range somebody
-    measured, and a model form carried into a regime nobody has. Those two fail
-    differently and only the first has an error bar.
-    """
-
-    quantity: str
-    published_range: str
-    used: str
-    status: str
-    basis: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -885,21 +872,6 @@ def build_scaling_figure(parameter_sets: tuple[ParameterSet, ...]) -> Figure:
     return figure
 
 
-def _boundary_tally(
-    soil: SoilUnderFoot, parameter_sets: tuple[ParameterSet, ...]
-) -> str:
-    rows = boundary_rows(soil, parameter_sets)
-    counts = {
-        status: sum(1 for row in rows if row.status == status)
-        for status in (INSIDE, OUTSIDE, UNMEASURED)
-    }
-    return (
-        f"Of {len(rows)} quantities, {counts[INSIDE]} sit inside a published "
-        f"range, {counts[OUTSIDE]} outside one, and {counts[UNMEASURED]} have "
-        "no published range at all."
-    )
-
-
 def _format_float(value: float) -> str:
     if not math.isfinite(value):
         return "nan"
@@ -980,21 +952,9 @@ def build_report(
         "# number interpolated inside a range somebody measured and a model form",
         "# carried into a regime nobody has. Only the first has an error bar.",
         "# Counts are generated, not written, so they cannot drift from the rows.",
-        f"# {_boundary_tally(soil, parameter_sets)}",
+        f"# {tally(boundary_rows(soil, parameter_sets))}",
         "",
-        *[
-            line
-            for row in boundary_rows(soil, parameter_sets)
-            for line in (
-                "[[boundary_row]]",
-                f'quantity = "{row.quantity}"',
-                f'published_range = "{row.published_range}"',
-                f'used = "{row.used}"',
-                f'status = "{row.status}"',
-                f'basis = "{row.basis}"',
-                "",
-            )
-        ],
+        *toml_lines(boundary_rows(soil, parameter_sets)),
         "[[caveat]]",
         'id = "lunar_parameters_cannot_be_exercised_at_earth_gravity"',
         "detail = \"\"\"",
@@ -1176,23 +1136,8 @@ def main(argv: list[str] | None = None) -> int:
     arguments.report.write_text(build_report(soil, parameter_sets), encoding="utf-8")
     print(f"wrote {arguments.report.relative_to(REPOSITORY_ROOT)}")
 
-    rows = boundary_rows(soil, parameter_sets)
-    headings = ("quantity", "published", "used", "status")
-    columns = [
-        (row.quantity, row.published_range, row.used, row.status) for row in rows
-    ]
-    widths = [
-        max(len(heading), *(len(cells[index]) for cells in columns))
-        for index, heading in enumerate(headings)
-    ]
     print("\n  measured against extrapolated\n")
-    for cells in (headings, *columns):
-        print(
-            "  "
-            + "  ".join(
-                cell.ljust(width) for cell, width in zip(cells, widths)
-            ).rstrip()
-        )
+    print(text_table(boundary_rows(soil, parameter_sets)))
     return 0
 
 
