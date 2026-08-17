@@ -18,13 +18,27 @@
 #                     on an assumed platform and is therefore much weaker
 #   the boundaries  where the published parameters stop supporting the answer
 #
-# The weakest input is the one that dominates the answer. Swing work per meter
-# is assumed, because no leg inertia has been measured or even specified for
-# this project, and at lunar gravity it is the largest term. Reporting a share
-# that rests on it would be reporting an assumption. So the study reports the
-# crossover instead: the swing cost at which swing overtakes everything the soil
-# contributes. That number depends only on the soil and the contact geometry,
-# and the reader can compare it against whatever platform they have.
+# Two inputs are assumed and both are load-bearing. Swing work per meter is the
+# obvious one: no leg inertia has been measured or even specified for this
+# project, and at lunar gravity it is the largest term. Slip ratio is the quiet
+# one, and it sits inside the crossover rather than beside it -- shear work is
+# very nearly linear in slip over this range, so halving or doubling the assumed
+# 0.10 moves the crossover threshold by about the same factor. Neither number
+# has evidence behind it.
+#
+# So the study reports the crossover rather than a share: the swing cost at
+# which swing overtakes everything the soil contributes. It still depends on the
+# assumed slip, which is why the sensitivity is reported beside it rather than
+# left implicit.
+#
+# The constant swing cost is also a simplification with a known direction.
+# Swinging a leg costs inertial work, which gravity does not touch, plus lifting
+# the foot to clear the ground, which scales with gravity. A real leg therefore
+# gets somewhat cheaper to swing at one sixth g, so holding the cost flat
+# overstates how much the normalized swing term rises. The direction of that
+# error runs the same way as the headline, and saying so is the point: the
+# finding is that the crossover threshold collapses, which is a property of the
+# soil, not that any particular platform crosses it.
 #
 # Magnitudes are deliberately not compared between soils. GRC-1's plate scaling
 # was fitted over half-widths of 38 to 95 mm and does not transfer to a foot,
@@ -62,6 +76,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.figure import Figure
+from matplotlib.patches import Rectangle
 from numpy.typing import NDArray
 
 from eclipse.analysis.style import (
@@ -70,6 +85,7 @@ from eclipse.analysis.style import (
     INK_MUTED,
     INK_PRIMARY,
     INK_SECONDARY,
+    SURFACE,
     figure_style,
 )
 from eclipse.io.soil import Dataset, load_soil
@@ -143,7 +159,17 @@ TERM_COLORS: Final[dict[str, str]] = {
 
 
 def caption(text: str, width: int = 132) -> str:
-    return textwrap.fill(" ".join(text.split()), width=width)
+    """Wrap to a fixed column, keeping explicit line breaks as paragraph breaks.
+
+    Matplotlib does not wrap text placed in figure coordinates, so a caption
+    that outgrows the canvas is silently clipped at the right edge rather than
+    flagged. Wrapping here is what stops that being discovered by looking at
+    the picture.
+    """
+    return "\n".join(
+        textwrap.fill(" ".join(paragraph.split()), width=width)
+        for paragraph in text.split("\n")
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +179,28 @@ class SoilUnderFoot:
     mobilization: JanosiHanamotoModel
     sinkage_ceiling_m: float
     half_width_range_m: tuple[float, float]
+
+
+INSIDE: Final = "inside_published_range"
+OUTSIDE: Final = "outside_published_range"
+UNMEASURED: Final = "no_published_range"
+
+
+@dataclass(frozen=True, slots=True)
+class BoundaryRow:
+    """One quantity, what was published about it, and what this study asked of it.
+
+    The distinction the table exists to make is not between confident and
+    uncertain. It is between a number interpolated inside a range somebody
+    measured, and a model form carried into a regime nobody has. Those two fail
+    differently and only the first has an error bar.
+    """
+
+    quantity: str
+    published_range: str
+    used: str
+    status: str
+    basis: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -367,6 +415,109 @@ def half_width_reaching_sinkage_ceiling(soil: SoilUnderFoot, gravity: float) -> 
     return 0.5 * (low + high)
 
 
+def boundary_rows(
+    soil: SoilUnderFoot, parameter_sets: tuple[ParameterSet, ...]
+) -> tuple[BoundaryRow, ...]:
+    ceiling_mm = soil.sinkage_ceiling_m * MILLIMETERS_PER_METER
+    rows = [
+        BoundaryRow(
+            quantity=f"sinkage, {name}",
+            published_range=f"0 to {ceiling_mm:.0f} mm",
+            used=f"{sinkage_at(soil, gravity, 0.0) * MILLIMETERS_PER_METER:.1f} mm",
+            status=(
+                INSIDE
+                if sinkage_at(soil, gravity, 0.0) <= soil.sinkage_ceiling_m
+                else OUTSIDE
+            ),
+            basis="Heiken et al. (1991) Table 9.14, quasi-static normal bearing",
+        )
+        for name, gravity in GRAVITIES
+    ]
+    rows.append(
+        BoundaryRow(
+            quantity="contact half-width, lunar parameters",
+            published_range=(
+                f"{soil.half_width_range_m[0] * MILLIMETERS_PER_METER:.0f} to "
+                f"{soil.half_width_range_m[1] * MILLIMETERS_PER_METER:.0f} mm"
+            ),
+            used=f"{FOOT_HALF_WIDTH_M * MILLIMETERS_PER_METER:.0f} mm",
+            status=INSIDE,
+            basis="Heiken et al. (1991) section 9.1.9, footings under 0.5 m",
+        )
+    )
+    rows.append(
+        BoundaryRow(
+            quantity="contact half-width, GRC-1 parameters",
+            published_range="38 to 95 mm",
+            used=f"{FOOT_HALF_WIDTH_M * MILLIMETERS_PER_METER:.0f} mm",
+            status=OUTSIDE,
+            basis="Oravec (2009), three plates; only the exponent is used here",
+        )
+    )
+    rows.append(
+        BoundaryRow(
+            quantity="shear strength depth",
+            published_range="0 to 15 cm, shallowest row published",
+            used=(
+                f"{sinkage_at(soil, LUNAR_GRAVITY, 0.0) * MILLIMETERS_PER_METER:.1f}"
+                " mm at lunar gravity"
+            ),
+            status=INSIDE,
+            basis="Heiken et al. (1991) Table 9.12",
+        )
+    )
+    rows.append(
+        BoundaryRow(
+            quantity="shear mobilization under gait",
+            published_range="none",
+            used="Janosi-Hanamoto at K = 1.8 cm, applied per footfall",
+            status=UNMEASURED,
+            basis=(
+                "K is from in-situ slip observations under steady loading; "
+                "repeated loading at gait rates on already-disturbed soil is "
+                "measured nowhere in this repository"
+            ),
+        )
+    )
+    rows.append(
+        BoundaryRow(
+            quantity="slip ratio",
+            published_range="none",
+            used=f"{SLIP_RATIO:.2f}, held fixed",
+            status=UNMEASURED,
+            basis=(
+                "assumed; shear work is very nearly linear in it, so the "
+                "crossover threshold moves with it by about the same factor"
+            ),
+        )
+    )
+    rows.append(
+        BoundaryRow(
+            quantity="swing work per meter",
+            published_range="none",
+            used=f"{NOMINAL_SWING_WORK_PER_METER_J:.0f} J/m, held constant",
+            status=UNMEASURED,
+            basis=(
+                "assumed; a real leg costs inertial work plus foot clearance "
+                "against gravity, so a flat value overstates the lunar rise"
+            ),
+        )
+    )
+    rows.append(
+        BoundaryRow(
+            quantity="reduced-gravity granular flow",
+            published_range="none",
+            used="none; every model here is gravity-independent in form",
+            status=UNMEASURED,
+            basis=(
+                "cannot be validated on Earth at all, and no model in this "
+                "study claims to represent it"
+            ),
+        )
+    )
+    return tuple(rows)
+
+
 def compaction_against_gravity(parameters: ParameterSet) -> NDArray[np.float64]:
     """Compaction cost per meter, normalized by weight and by its Earth value.
 
@@ -400,6 +551,11 @@ def build_slip_figure(soil: SoilUnderFoot) -> Figure:
             figure_style(
                 {
                     "figure.figsize": (10.2, 4.9),
+                    "axes.titlesize": 9.5,
+                    "xtick.labelsize": 8.5,
+                    "ytick.labelsize": 8.5,
+                    "font.size": 9.5,
+                    "legend.fontsize": 8.0,
                     "figure.subplot.top": 0.715,
                     "figure.subplot.bottom": 0.230,
                     "figure.subplot.left": 0.066,
@@ -518,9 +674,14 @@ def build_decomposition_figure(soil: SoilUnderFoot) -> Figure:
             Any,
             figure_style(
                 {
-                    "figure.figsize": (10.6, 4.9),
-                    "figure.subplot.top": 0.685,
-                    "figure.subplot.bottom": 0.215,
+                    "figure.figsize": (10.6, 5.6),
+                    "axes.titlesize": 9.5,
+                    "xtick.labelsize": 8.5,
+                    "ytick.labelsize": 8.5,
+                    "font.size": 9.5,
+                    "legend.fontsize": 8.0,
+                    "figure.subplot.top": 0.640,
+                    "figure.subplot.bottom": 0.190,
                     "figure.subplot.left": 0.058,
                     "figure.subplot.right": 0.986,
                     "figure.subplot.wspace": 0.190,
@@ -558,17 +719,36 @@ def build_decomposition_figure(soil: SoilUnderFoot) -> Figure:
 
             depth_m = sinkage_at(soil, gravity, 0.0)
             if depth_m > soil.sinkage_ceiling_m:
+                # Struck through rather than annotated. A panel outside the
+                # model's validity range is not a weaker result of the same
+                # kind; it is not a result, and a corner note lets a reader take
+                # the curve at face value anyway.
+                panel.add_patch(
+                    Rectangle(
+                        (0.0, 0.0),
+                        1.0,
+                        1.0,
+                        transform=panel.transAxes,
+                        facecolor=SURFACE,
+                        alpha=0.62,
+                        hatch="////",
+                        edgecolor=INK_MUTED,
+                        linewidth=0.0,
+                        zorder=5.0,
+                    )
+                )
                 panel.annotate(
-                    "bearing extrapolated\n"
+                    "outside the model's validity range\n"
                     f"{depth_m * MILLIMETERS_PER_METER:.0f} mm sinkage against a "
                     f"{soil.sinkage_ceiling_m * MILLIMETERS_PER_METER:.0f} mm "
                     "published ceiling",
-                    xy=(0.97, 0.96),
+                    xy=(0.5, 0.5),
                     xycoords="axes fraction",
-                    ha="right",
-                    va="top",
-                    color=INK_SECONDARY,
-                    fontsize=7.4,
+                    ha="center",
+                    va="center",
+                    color=INK_PRIMARY,
+                    fontsize=8.0,
+                    zorder=6.0,
                 )
             if column == 0:
                 panel.set_ylabel("cost of transport (dimensionless)")
@@ -576,13 +756,13 @@ def build_decomposition_figure(soil: SoilUnderFoot) -> Figure:
                     handles=list(bands),
                     labels=list(LOCOMOTION_TERMS),
                     loc="upper left",
-                    bbox_to_anchor=(0.052, 0.800),
+                    bbox_to_anchor=(0.052, 0.725),
                     ncol=len(LOCOMOTION_TERMS),
                 )
 
         figure.suptitle(
-            "Normalized by weight, both soil terms fall with gravity while leg "
-            "swing rises",
+            "At one foot size, only lunar loading stays inside the soil model's "
+            "published range",
             color=INK_PRIMARY,
             fontsize=11.5,
             x=0.058,
@@ -591,18 +771,21 @@ def build_decomposition_figure(soil: SoilUnderFoot) -> Figure:
         )
         figure.text(
             0.058,
-            0.900,
+            0.910,
             caption(
-                "The gravitational term is omitted: normalized, it is exactly "
-                "sin(slope) at every gravity, so it is identical in all three "
-                f"panels. Assumed platform: {MASS_KG:.0f} kg, "
+                "Where the model holds, both soil terms fall with gravity once "
+                "normalized and leg swing rises. Comparing gravities at fixed "
+                "foot geometry cannot avoid leaving the range: Earth would need "
+                "a 136 mm pad, which is a different platform.\n"
+                "The gravitational term is omitted, being exactly sin(slope) at "
+                f"every gravity. Assumed: {MASS_KG:.0f} kg, "
                 f"{FOOT_HALF_WIDTH_M * MILLIMETERS_PER_METER:.0f} mm half-width "
                 f"patches, {FEET_IN_STANCE} in stance, "
                 f"{STRIDE_LENGTH_M * MILLIMETERS_PER_METER:.0f} mm stride, slip "
-                f"ratio {SLIP_RATIO:.2f}, swing "
-                f"{NOMINAL_SWING_WORK_PER_METER_J:.0f} J per meter. Swing is "
-                "assumed rather than measured, and the shares depend on it; the "
-                "exponents do not."
+                f"{SLIP_RATIO:.2f}, swing "
+                f"{NOMINAL_SWING_WORK_PER_METER_J:.0f} J/m; slip and swing are "
+                "both assumed, and the shares depend on them.",
+                width=148,
             ),
             color=INK_SECONDARY,
             fontsize=8.2,
@@ -620,6 +803,11 @@ def build_scaling_figure(parameter_sets: tuple[ParameterSet, ...]) -> Figure:
             figure_style(
                 {
                     "figure.figsize": (9.4, 5.2),
+                    "axes.titlesize": 9.5,
+                    "xtick.labelsize": 8.5,
+                    "ytick.labelsize": 8.5,
+                    "font.size": 9.5,
+                    "legend.fontsize": 8.0,
                     "figure.subplot.top": 0.720,
                     "figure.subplot.bottom": 0.198,
                     "figure.subplot.left": 0.098,
@@ -697,6 +885,21 @@ def build_scaling_figure(parameter_sets: tuple[ParameterSet, ...]) -> Figure:
     return figure
 
 
+def _boundary_tally(
+    soil: SoilUnderFoot, parameter_sets: tuple[ParameterSet, ...]
+) -> str:
+    rows = boundary_rows(soil, parameter_sets)
+    counts = {
+        status: sum(1 for row in rows if row.status == status)
+        for status in (INSIDE, OUTSIDE, UNMEASURED)
+    }
+    return (
+        f"Of {len(rows)} quantities, {counts[INSIDE]} sit inside a published "
+        f"range, {counts[OUTSIDE]} outside one, and {counts[UNMEASURED]} have "
+        "no published range at all."
+    )
+
+
 def _format_float(value: float) -> str:
     if not math.isfinite(value):
         return "nan"
@@ -772,6 +975,26 @@ def build_report(
             for name, gravity in GRAVITIES
         ],
         "",
+        "# The measured-versus-extrapolated boundary, quantity by quantity. The",
+        "# distinction is not between confident and uncertain: it is between a",
+        "# number interpolated inside a range somebody measured and a model form",
+        "# carried into a regime nobody has. Only the first has an error bar.",
+        "# Counts are generated, not written, so they cannot drift from the rows.",
+        f"# {_boundary_tally(soil, parameter_sets)}",
+        "",
+        *[
+            line
+            for row in boundary_rows(soil, parameter_sets)
+            for line in (
+                "[[boundary_row]]",
+                f'quantity = "{row.quantity}"',
+                f'published_range = "{row.published_range}"',
+                f'used = "{row.used}"',
+                f'status = "{row.status}"',
+                f'basis = "{row.basis}"',
+                "",
+            )
+        ],
         "[[caveat]]",
         'id = "lunar_parameters_cannot_be_exercised_at_earth_gravity"',
         "detail = \"\"\"",
@@ -952,6 +1175,24 @@ def main(argv: list[str] | None = None) -> int:
 
     arguments.report.write_text(build_report(soil, parameter_sets), encoding="utf-8")
     print(f"wrote {arguments.report.relative_to(REPOSITORY_ROOT)}")
+
+    rows = boundary_rows(soil, parameter_sets)
+    headings = ("quantity", "published", "used", "status")
+    columns = [
+        (row.quantity, row.published_range, row.used, row.status) for row in rows
+    ]
+    widths = [
+        max(len(heading), *(len(cells[index]) for cells in columns))
+        for index, heading in enumerate(headings)
+    ]
+    print("\n  measured against extrapolated\n")
+    for cells in (headings, *columns):
+        print(
+            "  "
+            + "  ".join(
+                cell.ljust(width) for cell, width in zip(cells, widths)
+            ).rstrip()
+        )
     return 0
 
 

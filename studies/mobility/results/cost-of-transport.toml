@@ -56,6 +56,83 @@ earth = 0.0681450383431591
 mars = 0.04158366480480402
 moon = 0.027196276911750986
 
+# The measured-versus-extrapolated boundary, quantity by quantity. The
+# distinction is not between confident and uncertain: it is between a
+# number interpolated inside a range somebody measured and a model form
+# carried into a regime nobody has. Only the first has an error bar.
+# Counts are generated, not written, so they cannot drift from the rows.
+# Of 10 quantities, 3 sit inside a published range, 3 outside one, and 4 have no published range at all.
+
+[[boundary_row]]
+quantity = "sinkage, earth"
+published_range = "0 to 20 mm"
+used = "100.1 mm"
+status = "outside_published_range"
+basis = "Heiken et al. (1991) Table 9.14, quasi-static normal bearing"
+
+[[boundary_row]]
+quantity = "sinkage, mars"
+published_range = "0 to 20 mm"
+used = "37.9 mm"
+status = "outside_published_range"
+basis = "Heiken et al. (1991) Table 9.14, quasi-static normal bearing"
+
+[[boundary_row]]
+quantity = "sinkage, moon"
+published_range = "0 to 20 mm"
+used = "16.5 mm"
+status = "inside_published_range"
+basis = "Heiken et al. (1991) Table 9.14, quasi-static normal bearing"
+
+[[boundary_row]]
+quantity = "contact half-width, lunar parameters"
+published_range = "0 to 250 mm"
+used = "30 mm"
+status = "inside_published_range"
+basis = "Heiken et al. (1991) section 9.1.9, footings under 0.5 m"
+
+[[boundary_row]]
+quantity = "contact half-width, GRC-1 parameters"
+published_range = "38 to 95 mm"
+used = "30 mm"
+status = "outside_published_range"
+basis = "Oravec (2009), three plates; only the exponent is used here"
+
+[[boundary_row]]
+quantity = "shear strength depth"
+published_range = "0 to 15 cm, shallowest row published"
+used = "16.5 mm at lunar gravity"
+status = "inside_published_range"
+basis = "Heiken et al. (1991) Table 9.12"
+
+[[boundary_row]]
+quantity = "shear mobilization under gait"
+published_range = "none"
+used = "Janosi-Hanamoto at K = 1.8 cm, applied per footfall"
+status = "no_published_range"
+basis = "K is from in-situ slip observations under steady loading; repeated loading at gait rates on already-disturbed soil is measured nowhere in this repository"
+
+[[boundary_row]]
+quantity = "slip ratio"
+published_range = "none"
+used = "0.10, held fixed"
+status = "no_published_range"
+basis = "assumed; shear work is very nearly linear in it, so the crossover threshold moves with it by about the same factor"
+
+[[boundary_row]]
+quantity = "swing work per meter"
+published_range = "none"
+used = "25 J/m, held constant"
+status = "no_published_range"
+basis = "assumed; a real leg costs inertial work plus foot clearance against gravity, so a flat value overstates the lunar rise"
+
+[[boundary_row]]
+quantity = "reduced-gravity granular flow"
+published_range = "none"
+used = "none; every model here is gravity-independent in form"
+status = "no_published_range"
+basis = "cannot be validated on Earth at all, and no model in this study claims to represent it"
+
 [[caveat]]
 id = "lunar_parameters_cannot_be_exercised_at_earth_gravity"
 detail = """
