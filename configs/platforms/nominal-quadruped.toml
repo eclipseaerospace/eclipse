@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# A nominal quadruped — not a design, and not a robot that exists.
+#
+# This file exists so that slip ratio and swing cost stop being invented inside
+# a study and start being consequences of a stated body. That is a real gain in
+# traceability and no gain at all in evidence: every number here is still
+# assumed. What changes is that the assumptions are now in one place, named,
+# and swappable, instead of scattered as constants through an analysis.
+#
+# The mass and geometry are in the range of terrestrial research quadrupeds of
+# roughly this size. They were not derived from a payload, a power budget or a
+# mission, because none of those exist yet, and choosing them well is a much
+# later problem that inherits every error in the evaluator that would judge the
+# choice.
+#
+# Keys match the constructor arguments of eclipse.platform.Platform, so loading
+# is Platform(**parameters) with no mapping layer and a renamed parameter fails
+# loudly at construction.
+
+schema_version = 1
+id             = "nominal-quadruped"
+
+[platform]
+name        = "Nominal quadruped"
+morphology  = "quadruped"
+basis       = "assumed"
+status      = "nominal_not_designed"
+
+[platform.parameters]
+# Mass split so the legs are twelve percent of the total. Leg mass is what sets
+# the inertial swing term, which is the term gravity does not touch, so it is
+# the single most consequential number in this file.
+body_mass_kg = 44.0
+leg_mass_kg  = 1.5
+legs         = 4
+
+# A rod of this length pivoting at the hip. The inertia model is a uniform rod
+# about one end; a real leg puts more mass proximally, so this overestimates.
+leg_length_m = 0.30
+
+# Two feet down is a trot. Four-point stance halves contact pressure and is
+# swept separately rather than set here.
+feet_in_stance = 2
+
+# Half-width and area are both stored rather than one derived from the other,
+# matching the contact layer, which refuses to assume a patch shape. For a
+# circular pad the two are consistent at pi*b^2.
+foot_half_width_m   = 0.030
+foot_contact_area_m2 = 2.827433388230814e-3
+
+stride_length_m = 0.30
+foot_clearance_m = 0.05
+
+# An operating condition rather than a platform property, and it belongs in the
+# boundary table for that reason. Swing work per meter goes as the square of
+# speed while the soil terms here do not depend on it at all, so this model
+# always prefers walking slower. Real platforms have a cost-of-transport
+# minimum at non-zero speed, set by standing power and actuator efficiency,
+# neither of which is modelled.
+nominal_speed_m_per_s = 0.5
