@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# A three-legged platform — a test of the interface, not a design.
+#
+# This file exists to answer one question: does swapping morphology require
+# touching code. Three legs is the cheapest useful alternative because it is
+# statically determinate. Three equilibrium equations, three unknown normal
+# loads, one solution — so the minimum-sum-of-squares rule the quadruped needs
+# has nothing to resolve here. If that rule had leaked into anything downstream,
+# a tripod is where it shows.
+#
+# Nothing about this is recommended. A tripod that lifts a foot is left standing
+# on two, and two feet cannot balance a body unless its centre of mass lies on
+# the line between them, which it does not here and would not on a slope in any
+# case. So a three-legged platform has no statically stable walking gait at all:
+# it can stand, and it can fall over. That is a real result about tripods rather
+# than a limitation of the model, and it is why the file carries a standing
+# stance rather than a gait.
+#
+# Geometry is rear-biased on purpose. One foot forward and two aft puts the
+# centre of mass inside the support triangle, and climbing shifts the effective
+# centre of mass toward the rear pair, so it stays inside. The mirror
+# arrangement — two forward, one aft — is already tipping on level ground.
+#
+# The footprint is last, as in every platform file: a TOML array of tables
+# swallows every scalar written after it.
+
+schema_version = 1
+id             = "nominal-tripod"
+
+[platform]
+name        = "Nominal tripod"
+morphology  = "tripod"
+basis       = "assumed"
+status      = "interface_test_not_a_design"
+
+[platform.parameters]
+body_mass_kg = 45.5
+leg_mass_kg  = 1.5
+leg_length_m = 0.30
+
+# Three down and nothing swinging. A tripod cannot do better than standing
+# without leaving itself on two feet, which is not a stance.
+feet_in_stance = 3
+
+center_of_mass_height_m = 0.30
+
+foot_half_width_m   = 0.030
+foot_contact_area_m2 = 2.827433388230814e-3
+
+stride_length_m = 0.30
+foot_clearance_m = 0.05
+nominal_speed_m_per_s = 0.5
+
+[[platform.parameters.footprint]]
+id  = "front"
+x_m = 0.25
+y_m = 0.0
+
+[[platform.parameters.footprint]]
+id  = "rear-left"
+x_m = -0.25
+y_m = 0.175
+
+[[platform.parameters.footprint]]
+id  = "rear-right"
+x_m = -0.25
+y_m = -0.175

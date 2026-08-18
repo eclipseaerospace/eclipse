@@ -26,9 +26,14 @@ import pytest
 from eclipse.io.platform import load_platform
 from eclipse.platform import FootPosition, Platform
 from eclipse.stance import (
+    Gait,
     UnbalanceableStanceError,
     distribute_normal_load,
+    swing_reaction,
+    wave_gait,
+    within_stride_slip_ratio,
 )
+from eclipse.terramechanics import JanosiHanamotoModel, MohrCoulombModel
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 NOMINAL_QUADRUPED = (
@@ -377,3 +382,251 @@ def test_feet_must_have_distinct_identifiers() -> None:
 def test_a_foot_at_no_finite_position_is_refused(bad: float) -> None:
     with pytest.raises(ValueError, match="must be finite"):
         FootPosition(id="nowhere", x_m=bad, y_m=0.0)
+
+
+# --- gait as a schedule
+
+
+@pytest.fixture(scope="module")
+def crawl() -> Gait:
+    # Lift order rear-left, front-left, rear-right, front-right against a
+    # footprint ordered front-left, front-right, rear-left, rear-right.
+    return wave_gait(lift_order=(2, 0, 3, 1), duty_factor=0.75)
+
+
+def test_a_wave_gait_lifts_one_foot_at_a_time_at_three_quarter_duty(
+    crawl: Gait,
+) -> None:
+    phase = np.linspace(0.0, 1.0, 401, endpoint=False)
+    assert np.all(crawl.feet_down(phase) == 3)
+
+
+def test_every_leg_is_in_stance_for_exactly_the_duty_factor(crawl: Gait) -> None:
+    phase = np.linspace(0.0, 1.0, 20001, endpoint=False)
+    fraction = crawl.in_stance(phase).mean(axis=1)
+    assert np.allclose(fraction, crawl.duty_factor, atol=1e-3)
+
+
+def test_a_lift_order_that_is_not_a_permutation_is_refused() -> None:
+    with pytest.raises(ValueError, match="permutation"):
+        wave_gait(lift_order=(0, 0, 1, 2), duty_factor=0.75)
+
+
+@pytest.mark.parametrize("duty", [0.0, -0.1, 1.5])
+def test_an_unusable_duty_factor_is_refused(duty: float) -> None:
+    with pytest.raises(ValueError, match=r"duty_factor must lie in \(0, 1\]"):
+        Gait(duty_factor=duty, phase_offsets=(0.0, 0.5))
+
+
+def test_a_gait_that_does_not_match_the_footprint_is_refused(
+    quadruped: Platform,
+) -> None:
+    with pytest.raises(ValueError, match="does not match the footprint"):
+        swing_reaction(
+            platform=quadruped,
+            gait=Gait(duty_factor=0.75, phase_offsets=(0.0, 0.5)),
+        )
+
+
+# --- within-stride slip, which replaces rung two's exact zero
+
+
+def test_level_ground_slip_is_no_longer_zero(
+    quadruped: Platform, crawl: Gait
+) -> None:
+    slip, reaction = within_stride_slip_ratio(
+        platform=quadruped,
+        gait=crawl,
+        strength=MohrCoulombModel(cohesion=0.52, friction_angle_degrees=42.0),
+        mobilization=JanosiHanamotoModel(shear_deformation_modulus=0.018),
+        gravity_m_per_s2=LUNAR_GRAVITY,
+    )
+    assert reaction.peak_N > 0.0
+    assert slip > 0.0, (
+        "rung two returned exactly zero here because level ground demands no "
+        "net traction; swinging a leg demands traction within the stride, and "
+        "that is the mechanism the earlier model lacked"
+    )
+
+
+def test_swing_reaction_cancels_when_swings_are_in_antiphase(
+    quadruped: Platform,
+) -> None:
+    # Four legs evenly spaced at half duty puts two legs in swing at once, one
+    # accelerating while the other decelerates, and the reactions cancel
+    # exactly. A real trot phases its diagonal pairs together instead, so they
+    # add. The schedule decides, which is why it is a schedule.
+    antiphase = wave_gait(lift_order=(2, 0, 3, 1), duty_factor=0.5)
+    trot = Gait(duty_factor=0.5, phase_offsets=(0.0, 0.5, 0.5, 0.0))
+
+    assert swing_reaction(platform=quadruped, gait=antiphase).peak_N == pytest.approx(
+        0.0, abs=1e-9
+    )
+    assert swing_reaction(platform=quadruped, gait=trot).peak_N > 0.0
+
+
+def test_the_reaction_goes_as_the_square_of_speed(
+    quadruped: Platform, crawl: Gait
+) -> None:
+    def peak(speed: float) -> float:
+        faster = Platform(
+            **{
+                **{
+                    name: getattr(quadruped, name)
+                    for name in Platform.__dataclass_fields__
+                },
+                "nominal_speed_m_per_s": speed,
+            }
+        )
+        return swing_reaction(platform=faster, gait=crawl).peak_N
+
+    assert peak(1.0) / peak(0.5) == pytest.approx(4.0, rel=1e-9)
+
+
+def test_raising_the_duty_factor_raises_the_demand(quadruped: Platform) -> None:
+    # Static stability is bought with tangential demand: more feet down means a
+    # shorter swing, and swing acceleration goes as the inverse square of swing
+    # duration. Past some duty factor the demand exceeds capacity and the gait
+    # cannot be executed at this speed at all.
+    peaks = [
+        swing_reaction(
+            platform=quadruped,
+            gait=wave_gait(lift_order=(2, 0, 3, 1), duty_factor=duty),
+        ).peak_N
+        for duty in (0.75, 0.80, 0.85)
+    ]
+    assert all(later > earlier for earlier, later in zip(peaks, peaks[1:]))
+
+    infeasible, _ = within_stride_slip_ratio(
+        platform=quadruped,
+        gait=wave_gait(lift_order=(2, 0, 3, 1), duty_factor=0.85),
+        strength=MohrCoulombModel(cohesion=0.52, friction_angle_degrees=42.0),
+        mobilization=JanosiHanamotoModel(shear_deformation_modulus=0.018),
+        gravity_m_per_s2=LUNAR_GRAVITY,
+    )
+    assert not math.isfinite(infeasible)
+
+
+def test_a_gait_with_a_flight_phase_is_refused(quadruped: Platform) -> None:
+    with pytest.raises(ValueError, match="flight phase"):
+        within_stride_slip_ratio(
+            platform=quadruped,
+            gait=Gait(duty_factor=0.2, phase_offsets=(0.0, 0.25, 0.5, 0.75)),
+            strength=MohrCoulombModel(cohesion=0.52, friction_angle_degrees=42.0),
+            mobilization=JanosiHanamotoModel(shear_deformation_modulus=0.018),
+            gravity_m_per_s2=LUNAR_GRAVITY,
+        )
+
+
+def test_the_reaction_is_reported_against_what_it_would_otherwise_be(
+    quadruped: Platform, crawl: Gait
+) -> None:
+    # The ground force is an upper bound. A body free to slow down takes the
+    # same momentum change as a speed fluctuation and demands nothing of the
+    # soil, so the honest answer is the pair rather than either alone.
+    reaction = swing_reaction(platform=quadruped, gait=crawl)
+    assert reaction.body_speed_fluctuation_m_per_s > 0.0
+    assert reaction.body_speed_fluctuation_m_per_s < (
+        quadruped.nominal_speed_m_per_s
+    ), "a fluctuation larger than the mean speed would mean the body reverses"
+
+
+def test_only_the_slope_feasible_gait_pays_for_it_on_the_flat(
+    quadruped: Platform,
+) -> None:
+    strength = MohrCoulombModel(cohesion=0.52, friction_angle_degrees=42.0)
+    mobilization = JanosiHanamotoModel(shear_deformation_modulus=0.018)
+
+    def flat_slip(gait: Gait) -> float:
+        return within_stride_slip_ratio(
+            platform=quadruped,
+            gait=gait,
+            strength=strength,
+            mobilization=mobilization,
+            gravity_m_per_s2=LUNAR_GRAVITY,
+        )[0]
+
+    trot = Gait(duty_factor=0.5, phase_offsets=(0.0, 0.5, 0.5, 0.0))
+    crawl = wave_gait(lift_order=(2, 0, 3, 1), duty_factor=0.75)
+
+    assert flat_slip(crawl) > flat_slip(trot), (
+        "the gait that keeps three feet down, and so has a quasi-static "
+        "solution on a slope, is the one with more within-stride slip on the "
+        "flat; static feasibility and traction demand pull against each other"
+    )
+
+
+# --- the interface, tested by a different morphology
+
+
+NOMINAL_TRIPOD = REPOSITORY_ROOT / "configs" / "platforms" / "nominal-tripod.toml"
+
+
+@pytest.fixture(scope="module")
+def tripod() -> Platform:
+    return load_platform(NOMINAL_TRIPOD).platform
+
+
+def test_a_different_morphology_is_a_different_file_and_no_code_change(
+    tripod: Platform,
+) -> None:
+    # The falsifiable test the architecture states. Everything below is the same
+    # call the quadruped makes, against a platform with a different number of
+    # legs, and nothing in the library was told which it is.
+    distribution = distribute_normal_load(
+        platform=tripod,
+        gravity_m_per_s2=LUNAR_GRAVITY,
+        slope_degrees=np.array([0.0, 10.0, 20.0]),
+    )
+    assert distribution.normal_load_N.shape == (3, 3)
+    assert not bool(np.any(distribution.any_foot_unloaded))
+
+    patches = distribution.loaded_patches(index=0)
+    assert len(patches) == 3
+    assert [p.id for p in patches] == ["front", "rear-left", "rear-right"]
+
+
+def test_the_tripod_needs_no_resolution_rule(tripod: Platform) -> None:
+    positions = np.array([[f.x_m, f.y_m] for f in tripod.footprint])
+    balance = np.vstack([np.ones(3), positions[:, 0], positions[:, 1]])
+    assert np.linalg.matrix_rank(balance) == 3, (
+        "three non-collinear feet make the normal-load problem determinate, so "
+        "the quadruped's minimum-norm rule has nothing to choose here; if a "
+        "result changes when that rule changes, it leaked"
+    )
+
+
+def test_a_tripod_has_no_statically_stable_walking_gait(tripod: Platform) -> None:
+    # Lifting any foot leaves two, and two feet balance a body only if its
+    # centre of mass lies on the line between them. A tripod can stand and it
+    # can fall over. This is a fact about tripods, surfaced by the same solve
+    # the quadruped uses.
+    for lifted in range(3):
+        remaining = tuple(
+            foot for index, foot in enumerate(tripod.footprint) if index != lifted
+        )
+        with pytest.raises(UnbalanceableStanceError):
+            distribute_normal_load(
+                platform=tripod,
+                stance=remaining,
+                gravity_m_per_s2=LUNAR_GRAVITY,
+                slope_degrees=5.0,
+            )
+
+
+def test_the_tripod_tips_where_its_own_geometry_says(tripod: Platform) -> None:
+    # Same formula, different footprint: the rear pair is at -0.25 and the front
+    # foot at +0.25, so the front foot unloads at tan(slope) = L/h just as the
+    # quadruped's uphill pair does. The rule is geometry, not leg count.
+    half_length = max(foot.x_m for foot in tripod.footprint)
+    expected = math.degrees(
+        math.atan(half_length / tripod.center_of_mass_height_m)
+    )
+    below = distribute_normal_load(
+        platform=tripod, gravity_m_per_s2=LUNAR_GRAVITY, slope_degrees=expected - 0.5
+    )
+    above = distribute_normal_load(
+        platform=tripod, gravity_m_per_s2=LUNAR_GRAVITY, slope_degrees=expected + 0.5
+    )
+    assert not bool(np.ravel(below.any_foot_unloaded)[0])
+    assert bool(np.ravel(above.any_foot_unloaded)[0])
