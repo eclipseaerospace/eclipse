@@ -17,6 +17,10 @@
 # Keys match the constructor arguments of eclipse.platform.Platform, so loading
 # is Platform(**parameters) with no mapping layer and a renamed parameter fails
 # loudly at construction.
+#
+# The footprint is last on purpose. An array of tables in TOML swallows every
+# scalar key that follows it, so a footprint written above these values would
+# silently become part of a foot rather than of the platform.
 
 schema_version = 1
 id             = "nominal-quadruped"
@@ -33,7 +37,6 @@ status      = "nominal_not_designed"
 # the single most consequential number in this file.
 body_mass_kg = 44.0
 leg_mass_kg  = 1.5
-legs         = 4
 
 # A rod of this length pivoting at the hip. The inertia model is a uniform rod
 # about one end; a real leg puts more mass proximally, so this overestimates.
@@ -42,6 +45,13 @@ leg_length_m = 0.30
 # Two feet down is a trot. Four-point stance halves contact pressure and is
 # swept separately rather than set here.
 feet_in_stance = 2
+
+# The centre of mass sits this far above the plane of the contacts. On a slope
+# the along-surface component of weight acts here rather than at the ground, so
+# this height alone is what shifts load onto the downhill feet. A platform whose
+# centre of mass lay in the contact plane would load its feet evenly on every
+# gradient, which is why this number matters more than its precision suggests.
+center_of_mass_height_m = 0.30
 
 # Half-width and area are both stored rather than one derived from the other,
 # matching the contact layer, which refuses to assume a patch shape. For a
@@ -59,3 +69,27 @@ foot_clearance_m = 0.05
 # minimum at non-zero speed, set by standing power and actuator efficiency,
 # neither of which is modelled.
 nominal_speed_m_per_s = 0.5
+
+# The footprint replaces a leg count. Uphill is +x, so a foot at negative x is
+# downhill of the body centre when climbing. Positions are given rather than
+# derived from a body length and width, so that three legs, or six, or an
+# asymmetric arrangement, is a different file and not a different code path.
+[[platform.parameters.footprint]]
+id  = "front-left"
+x_m = 0.25
+y_m = 0.175
+
+[[platform.parameters.footprint]]
+id  = "front-right"
+x_m = 0.25
+y_m = -0.175
+
+[[platform.parameters.footprint]]
+id  = "rear-left"
+x_m = -0.25
+y_m = 0.175
+
+[[platform.parameters.footprint]]
+id  = "rear-right"
+x_m = -0.25
+y_m = -0.175

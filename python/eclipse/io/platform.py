@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
 
-from eclipse.platform import Platform
+from eclipse.platform import FootPosition, Platform
 
 __all__ = ["PlatformDefinition", "PlatformFileError", "load_platform"]
 
@@ -69,8 +69,23 @@ def load_platform(path: Path | str) -> PlatformDefinition:
     definition = _require(table, "platform", str(source_path))
     parameters = _require(definition, "parameters", f"{source_path} [platform]")
 
+    values = dict(parameters)
+    footprint = values.pop("footprint", None)
+    if footprint is None:
+        raise PlatformFileError(
+            f"{source_path}: [platform.parameters] declares no footprint; a "
+            "platform is defined by where its feet are, not by how many it has"
+        )
     try:
-        platform = Platform(**parameters)
+        values["footprint"] = tuple(FootPosition(**foot) for foot in footprint)
+    except TypeError as error:
+        raise PlatformFileError(
+            f"{source_path}: a [[platform.parameters.footprint]] entry does not "
+            f"match FootPosition: {error}"
+        ) from error
+
+    try:
+        platform = Platform(**values)
     except TypeError as error:
         raise PlatformFileError(
             f"{source_path}: [platform.parameters] does not match the Platform "

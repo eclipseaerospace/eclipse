@@ -70,6 +70,7 @@ from eclipse.mobility import ContactPatch
 from eclipse.terramechanics import JanosiHanamotoModel, MohrCoulombModel
 
 __all__ = [
+    "FootPosition",
     "Platform",
     "SwingWork",
     "TractionBalance",
@@ -94,6 +95,26 @@ TRIANGULAR_PEAK_OVER_MEAN: Final = 2.0
 
 
 @dataclass(frozen=True, slots=True)
+class FootPosition:
+    """Where a foot stands, in the plane of the contacts, relative to the body.
+
+    Uphill is +x and the surface normal is +z, so a foot at negative x is
+    downhill of the body centre when the platform is climbing. Two coordinates
+    and no third: the feet define the contact plane, so their height in it is
+    zero by construction rather than by assumption.
+    """
+
+    id: str
+    x_m: float
+    y_m: float
+
+    def __post_init__(self) -> None:
+        for name, value in (("x_m", self.x_m), ("y_m", self.y_m)):
+            if not math.isfinite(value):
+                raise ValueError(f"{name} must be finite, got {value}")
+
+
+@dataclass(frozen=True, slots=True)
 class Platform:
     """One body, carrying only what the mobility layer needs to stop assuming.
 
@@ -106,7 +127,8 @@ class Platform:
     body_mass_kg: float
     leg_mass_kg: float
     leg_length_m: float
-    legs: int
+    footprint: tuple[FootPosition, ...]
+    center_of_mass_height_m: float
     feet_in_stance: int
     foot_half_width_m: float
     foot_contact_area_m2: float
@@ -124,11 +146,18 @@ class Platform:
             ("stride_length_m", self.stride_length_m),
             ("foot_clearance_m", self.foot_clearance_m),
             ("nominal_speed_m_per_s", self.nominal_speed_m_per_s),
+            ("center_of_mass_height_m", self.center_of_mass_height_m),
         ):
             if not (math.isfinite(value) and value > 0.0):
                 raise ValueError(f"{name} must be finite and positive, got {value}")
-        if self.legs < 1:
-            raise ValueError(f"legs must be at least one, got {self.legs}")
+        if len(self.footprint) < 1:
+            raise ValueError("footprint must name at least one foot, got none")
+        identifiers = [foot.id for foot in self.footprint]
+        if len(set(identifiers)) != len(identifiers):
+            raise ValueError(
+                f"footprint feet must have distinct ids, got {identifiers}; "
+                "a repeated id makes a per-foot result impossible to attribute"
+            )
         if not 1 <= self.feet_in_stance <= self.legs:
             raise ValueError(
                 f"feet_in_stance must lie between one and legs ({self.legs}), got "
@@ -142,6 +171,10 @@ class Platform:
                 f"leg_length_m {self.leg_length_m}, so the hip cannot sweep the "
                 "foot that far; the geometry has no solution rather than a poor one"
             )
+
+    @property
+    def legs(self) -> int:
+        return len(self.footprint)
 
     @property
     def total_mass_kg(self) -> float:

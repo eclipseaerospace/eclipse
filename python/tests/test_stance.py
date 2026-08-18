@@ -1,0 +1,379 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Tests for eclipse.stance.
+#
+# Equilibrium is checked directly rather than through the solver that produced
+# it: the returned loads are substituted back into the force and moment sums.
+# A solver that agreed with itself would prove nothing.
+#
+# The resolution rule is tested as a property rather than against stored
+# numbers. Minimum sum of squares means every other solution of the same
+# equilibrium is larger, and the null-space direction of a rectangular footprint
+# is known in closed form, so that can be asserted rather than trusted.
+#
+# The stances that have no solution get as much attention as the ones that do.
+# A diagonal pair balances on level ground and on no slope at all, which is the
+# stance rungs two and three of this project assumed throughout.
+
+from __future__ import annotations
+
+import math
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from eclipse.io.platform import load_platform
+from eclipse.platform import FootPosition, Platform
+from eclipse.stance import (
+    UnbalanceableStanceError,
+    distribute_normal_load,
+)
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+NOMINAL_QUADRUPED = (
+    REPOSITORY_ROOT / "configs" / "platforms" / "nominal-quadruped.toml"
+)
+
+LUNAR_GRAVITY = 1.62
+EARTH_GRAVITY = 9.81
+
+
+@pytest.fixture(scope="module")
+def quadruped() -> Platform:
+    return load_platform(NOMINAL_QUADRUPED).platform
+
+
+def _feet(platform: Platform, *identifiers: str) -> tuple[FootPosition, ...]:
+    by_id = {foot.id: foot for foot in platform.footprint}
+    return tuple(by_id[identifier] for identifier in identifiers)
+
+
+def _loads(platform: Platform, slope: float, *identifiers: str) -> np.ndarray:
+    stance = _feet(platform, *identifiers) if identifiers else platform.footprint
+    return np.ravel(
+        distribute_normal_load(
+            platform=platform,
+            stance=stance,
+            gravity_m_per_s2=LUNAR_GRAVITY,
+            slope_degrees=slope,
+        ).normal_load_N
+    )
+
+
+# --- equilibrium, checked against the equations rather than the solver
+
+
+@pytest.mark.parametrize("slope", [0.0, 10.0, 25.0, 35.0])
+def test_the_loads_satisfy_force_and_moment_balance(
+    quadruped: Platform, slope: float
+) -> None:
+    loads = _loads(quadruped, slope)
+    weight_N = quadruped.total_mass_kg * LUNAR_GRAVITY
+    radians = math.radians(slope)
+
+    assert loads.sum() == pytest.approx(weight_N * math.cos(radians))
+
+    positions = np.array([[f.x_m, f.y_m] for f in quadruped.footprint])
+    pitching = -weight_N * math.sin(radians) * quadruped.center_of_mass_height_m
+    assert float(positions[:, 0] @ loads) == pytest.approx(pitching, abs=1e-9)
+    assert float(positions[:, 1] @ loads) == pytest.approx(0.0, abs=1e-9)
+
+
+def test_level_ground_splits_the_load_evenly(quadruped: Platform) -> None:
+    loads = _loads(quadruped, 0.0)
+    assert np.allclose(loads, loads[0])
+    assert float(loads[0]) == pytest.approx(
+        quadruped.total_mass_kg * LUNAR_GRAVITY / quadruped.legs
+    )
+
+
+def test_load_moves_downhill_and_the_spread_grows_with_slope(
+    quadruped: Platform,
+) -> None:
+    downhill = {"rear-left", "rear-right"}
+    spreads = []
+    for slope in (0.0, 10.0, 20.0, 30.0):
+        distribution = distribute_normal_load(
+            platform=quadruped,
+            gravity_m_per_s2=LUNAR_GRAVITY,
+            slope_degrees=slope,
+        )
+        loads = dict(
+            zip(
+                (foot.id for foot in distribution.feet),
+                np.ravel(distribution.normal_load_N),
+            )
+        )
+        if slope > 0.0:
+            for uphill in ("front-left", "front-right"):
+                for behind in downhill:
+                    assert loads[behind] > loads[uphill], (
+                        "climbing shifts load onto the downhill feet; if it did "
+                        "not, the centre of mass height is not entering the "
+                        "moment balance"
+                    )
+        spreads.append(float(np.ravel(distribution.spread)[0]))
+    assert all(later > earlier for earlier, later in zip(spreads, spreads[1:]))
+
+
+def test_the_spread_is_what_the_single_patch_model_averaged_away(
+    quadruped: Platform,
+) -> None:
+    distribution = distribute_normal_load(
+        platform=quadruped, gravity_m_per_s2=LUNAR_GRAVITY, slope_degrees=35.0
+    )
+    assert float(np.ravel(distribution.spread)[0]) == pytest.approx(1.84, abs=0.02)
+    assert float(np.ravel(distribution.mean_N)[0]) == pytest.approx(
+        quadruped.total_mass_kg * LUNAR_GRAVITY * math.cos(math.radians(35.0)) / 4.0
+    ), "the mean is exactly what dividing by the foot count gives, which is why it hides this"
+
+
+# --- the resolution rule
+
+
+def test_the_solution_minimises_the_sum_of_squared_loads(
+    quadruped: Platform,
+) -> None:
+    # For a rectangular footprint the null space of the equilibrium map is
+    # spanned by (1, -1, -1, 1): it carries no net force and no moment about
+    # either axis, so adding any multiple of it is another valid distribution.
+    loads = _loads(quadruped, 20.0)
+    null_direction = np.array([1.0, -1.0, -1.0, 1.0])
+
+    positions = np.array([[f.x_m, f.y_m] for f in quadruped.footprint])
+    assert null_direction.sum() == pytest.approx(0.0)
+    assert float(positions[:, 0] @ null_direction) == pytest.approx(0.0)
+    assert float(positions[:, 1] @ null_direction) == pytest.approx(0.0)
+
+    chosen = float(loads @ loads)
+    for step in (-2.0, -0.5, 0.5, 2.0):
+        alternative = loads + step * null_direction
+        assert float(alternative @ alternative) > chosen
+
+
+def test_a_tripod_is_determinate_so_the_rule_does_not_apply(
+    quadruped: Platform,
+) -> None:
+    # Three equations, three unknowns. There is one distribution and no choice
+    # to make, which is why a three-legged platform is the honest test of
+    # whether the rule leaked into anything downstream.
+    stance = _feet(quadruped, "front-left", "rear-left", "rear-right")
+    positions = np.array([[f.x_m, f.y_m] for f in stance])
+    balance = np.vstack([np.ones(3), positions[:, 0], positions[:, 1]])
+    assert np.linalg.matrix_rank(balance) == 3
+
+    loads = _loads(quadruped, 20.0, "front-left", "rear-left", "rear-right")
+    weight_N = quadruped.total_mass_kg * LUNAR_GRAVITY
+    radians = math.radians(20.0)
+    unique = np.linalg.solve(
+        balance,
+        np.array(
+            [
+                weight_N * math.cos(radians),
+                -weight_N
+                * math.sin(radians)
+                * quadruped.center_of_mass_height_m,
+                0.0,
+            ]
+        ),
+    )
+    assert np.allclose(loads, unique)
+
+
+# --- stances with no solution
+
+
+def test_a_diagonal_pair_balances_on_the_flat_and_on_no_slope_at_all(
+    quadruped: Platform,
+) -> None:
+    # The stance rungs two and three assumed. Its two feet lie on a line through
+    # the body centre, so the lateral moment equation forces the loads equal
+    # while the pitching moment from a slope requires them unequal. On level
+    # ground there is no pitching moment and the stance is fine; on any gradient
+    # it has no quasi-static solution, and a trotting quadruped on a slope is
+    # balanced dynamically rather than statically.
+    flat = _loads(quadruped, 0.0, "front-left", "rear-right")
+    assert flat[0] == pytest.approx(flat[1])
+    assert flat.sum() == pytest.approx(quadruped.total_mass_kg * LUNAR_GRAVITY)
+
+    for slope in (1.0, 10.0, 30.0):
+        with pytest.raises(UnbalanceableStanceError, match="cannot balance"):
+            _loads(quadruped, slope, "front-left", "rear-right")
+
+
+def test_a_lateral_pair_cannot_balance_even_on_the_flat(
+    quadruped: Platform,
+) -> None:
+    with pytest.raises(UnbalanceableStanceError, match="cannot balance"):
+        _loads(quadruped, 0.0, "front-left", "front-right")
+
+
+def test_an_empty_stance_is_refused(quadruped: Platform) -> None:
+    with pytest.raises(UnbalanceableStanceError, match="no feet"):
+        distribute_normal_load(
+            platform=quadruped,
+            stance=(),
+            gravity_m_per_s2=LUNAR_GRAVITY,
+            slope_degrees=0.0,
+        )
+
+
+# --- tipping
+
+
+def test_a_front_biased_tripod_is_already_tipping_on_level_ground(
+    quadruped: Platform,
+) -> None:
+    # Two feet uphill and one downhill puts the centre of mass on the edge of
+    # the support triangle before the slope moves it anywhere.
+    distribution = distribute_normal_load(
+        platform=quadruped,
+        stance=_feet(quadruped, "front-left", "front-right", "rear-left"),
+        gravity_m_per_s2=LUNAR_GRAVITY,
+        slope_degrees=np.array([0.0, 20.0]),
+    )
+    assert bool(np.all(distribution.any_foot_unloaded))
+
+
+def test_the_four_foot_stance_tips_where_the_geometry_says_it_should(
+    quadruped: Platform,
+) -> None:
+    # With feet at plus and minus L and the centre of mass at height h, the
+    # uphill pair carries m*g*cos/4 - m*g*sin*h/(4L), which reaches zero at
+    # tan(slope) = L/h. Mass and gravity cancel: tipping is pure geometry.
+    half_length = max(foot.x_m for foot in quadruped.footprint)
+    expected = math.degrees(
+        math.atan(half_length / quadruped.center_of_mass_height_m)
+    )
+
+    for gravity in (LUNAR_GRAVITY, EARTH_GRAVITY):
+        below = distribute_normal_load(
+            platform=quadruped,
+            gravity_m_per_s2=gravity,
+            slope_degrees=expected - 0.5,
+        )
+        above = distribute_normal_load(
+            platform=quadruped,
+            gravity_m_per_s2=gravity,
+            slope_degrees=expected + 0.5,
+        )
+        assert not bool(np.ravel(below.any_foot_unloaded)[0])
+        assert bool(np.ravel(above.any_foot_unloaded)[0])
+
+
+def test_tipping_arrives_before_the_traction_limit(quadruped: Platform) -> None:
+    from eclipse.platform import maximum_traversable_slope_degrees
+    from eclipse.terramechanics import MohrCoulombModel
+
+    half_length = max(foot.x_m for foot in quadruped.footprint)
+    tipping = math.degrees(
+        math.atan(half_length / quadruped.center_of_mass_height_m)
+    )
+    slipping = maximum_traversable_slope_degrees(
+        platform=quadruped,
+        strength=MohrCoulombModel(cohesion=0.52, friction_angle_degrees=42.0),
+        gravity_m_per_s2=LUNAR_GRAVITY,
+    )
+    assert tipping < slipping, (
+        f"tipping at {tipping:.1f} degrees and slipping at {slipping:.1f}: the "
+        "platform rotates about its downhill feet before they slide, so the "
+        "traction limit is a bound on something that happens second"
+    )
+
+
+# --- what the mobility layer consumes
+
+
+def test_a_stance_produces_one_loaded_patch_per_foot(quadruped: Platform) -> None:
+    distribution = distribute_normal_load(
+        platform=quadruped, gravity_m_per_s2=LUNAR_GRAVITY, slope_degrees=25.0
+    )
+    patches = distribution.loaded_patches(index=0)
+    assert len(patches) == quadruped.legs
+    assert [p.id for p in patches] == [f.id for f in quadruped.footprint]
+    for patch in patches:
+        assert patch.normal_stress_kPa() == pytest.approx(
+            patch.normal_load_N / quadruped.foot_contact_area_m2 / 1000.0
+        )
+
+
+def test_the_loaded_patch_carries_no_notion_of_what_stands_on_it(
+    quadruped: Platform,
+) -> None:
+    patch = distribute_normal_load(
+        platform=quadruped, gravity_m_per_s2=LUNAR_GRAVITY, slope_degrees=0.0
+    ).loaded_patches(index=0)[0]
+    assert set(type(patch.patch).__dataclass_fields__) == {"half_width_m", "area_m2"}
+
+
+# --- the consequence the mean hides
+
+
+def test_a_small_foot_leaves_the_bearing_range_while_the_mean_stays_inside(
+    quadruped: Platform,
+) -> None:
+    # Sinkage is non-linear in pressure, so averaging load across feet is not
+    # conservative. At a 20 mm half-width the most-loaded foot passes the
+    # published 20 mm sinkage ceiling on a gentle slope while the mean, which is
+    # what the single-patch model used, never does at all.
+    half_width = 0.020
+    small_footed = Platform(
+        **{
+            **{
+                name: getattr(quadruped, name)
+                for name in Platform.__dataclass_fields__
+            },
+            "foot_half_width_m": half_width,
+            "foot_contact_area_m2": math.pi * half_width**2,
+        }
+    )
+    deformation_modulus_kPa_per_m = 1.4 / half_width + 820.0
+    ceiling_m = 0.020
+
+    def sinkage(load_N: float) -> float:
+        stress_kPa = load_N / (math.pi * half_width**2) / 1000.0
+        return stress_kPa / deformation_modulus_kPa_per_m
+
+    distribution = distribute_normal_load(
+        platform=small_footed,
+        gravity_m_per_s2=LUNAR_GRAVITY,
+        slope_degrees=np.linspace(0.0, 30.0, 61),
+    )
+    worst = sinkage(float(np.max(distribution.maximum_N)))
+    mean_worst = sinkage(float(np.max(distribution.mean_N)))
+
+    assert worst > ceiling_m
+    assert mean_worst <= ceiling_m, (
+        "the mean staying inside the range while the most-loaded foot leaves it "
+        "is the whole reason four contacts are not one contact scaled"
+    )
+
+
+# --- guards
+
+
+def test_feet_must_have_distinct_identifiers() -> None:
+    with pytest.raises(ValueError, match="distinct ids"):
+        Platform(
+            body_mass_kg=40.0,
+            leg_mass_kg=1.0,
+            leg_length_m=0.3,
+            footprint=(
+                FootPosition(id="a", x_m=0.2, y_m=0.1),
+                FootPosition(id="a", x_m=-0.2, y_m=-0.1),
+            ),
+            center_of_mass_height_m=0.3,
+            feet_in_stance=2,
+            foot_half_width_m=0.03,
+            foot_contact_area_m2=math.pi * 0.03**2,
+            stride_length_m=0.3,
+            foot_clearance_m=0.05,
+            nominal_speed_m_per_s=0.5,
+        )
+
+
+@pytest.mark.parametrize("bad", [math.nan, math.inf])
+def test_a_foot_at_no_finite_position_is_refused(bad: float) -> None:
+    with pytest.raises(ValueError, match="must be finite"):
+        FootPosition(id="nowhere", x_m=bad, y_m=0.0)
