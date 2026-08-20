@@ -62,6 +62,10 @@ __all__ = [
     "StanceDistribution",
     "UnbalanceableStanceError",
     "distribute_normal_load",
+    "executable_duty_ceiling",
+    "maximum_walking_speed",
+    "statically_stable_duty_factor",
+    "swing_demand_coefficient",
     "swing_reaction",
     "wave_gait",
     "within_stride_slip_ratio",
@@ -370,3 +374,97 @@ def within_stride_slip_ratio(
 
     slide_m = -mobilization.shear_deformation_modulus * np.log1p(-mobilized)
     return float(np.max(slide_m) / platform.stride_length_m), reaction
+
+
+def statically_stable_duty_factor(*, platform: Platform, feet_down: int = 3) -> float:
+    """The duty factor below which a wave gait drops under `feet_down` feet.
+
+    Arithmetic about leg count, not a property of soil or speed: to keep k of n
+    feet on the ground at all times, each leg must be in stance for at least
+    k/n of its cycle. Three of four gives three quarters. It is here so that a
+    study can state it as the textbook condition it is, rather than reporting it
+    as something a solver discovered -- though a solver rediscovering it from
+    equilibrium alone is a reason to trust the solver.
+    """
+    if not 1 <= feet_down <= platform.legs:
+        raise ValueError(
+            f"feet_down must lie between one and legs ({platform.legs}), got "
+            f"{feet_down}"
+        )
+    return feet_down / platform.legs
+
+
+def swing_demand_coefficient(
+    *,
+    platform: Platform,
+    strength: MohrCoulombModel,
+    gravity_m_per_s2: float,
+    feet_down: int = 3,
+) -> float:
+    """The constant k for which the executable duty ceiling is 1 - k*speed.
+
+    Swing acceleration goes as the inverse square of swing duration and swing
+    duration is (1 - duty) * stride_length / speed, so demand goes as
+    speed^2 / (1 - duty)^2. Setting that equal to the traction capacity and
+    solving gives a ceiling linear in speed, with everything else folded into
+    this coefficient.
+
+    Assumes one leg swinging at a time, which a wave gait satisfies at or above
+    the statically stable duty factor -- exactly the region the ceiling matters
+    in. Below that, swings overlap and their reactions add or cancel depending
+    on phase, and no single coefficient describes it.
+    """
+    capacity_N = (
+        feet_down * strength.cohesion * KILO * platform.foot_contact_area_m2
+        + platform.total_mass_kg * gravity_m_per_s2 * strength.friction_coefficient
+    )
+    swept = (
+        4.0
+        * platform.leg_mass_kg
+        * ROD_CENTER_OF_MASS_FRACTION
+        * platform.leg_length_m
+        * platform.hip_sweep_radians
+    )
+    return math.sqrt(swept / capacity_N) / platform.stride_length_m
+
+
+def executable_duty_ceiling(
+    *,
+    platform: Platform,
+    strength: MohrCoulombModel,
+    gravity_m_per_s2: float,
+    speed_m_per_s: ArrayLike,
+    feet_down: int = 3,
+) -> NDArray[np.float64]:
+    coefficient = swing_demand_coefficient(
+        platform=platform,
+        strength=strength,
+        gravity_m_per_s2=gravity_m_per_s2,
+        feet_down=feet_down,
+    )
+    return np.asarray(
+        1.0 - coefficient * np.asarray(speed_m_per_s, dtype=np.float64)
+    )
+
+
+def maximum_walking_speed(
+    *,
+    platform: Platform,
+    strength: MohrCoulombModel,
+    gravity_m_per_s2: float,
+    feet_down: int = 3,
+) -> float:
+    """Where the executable ceiling meets the statically stable floor.
+
+    Above this there is no duty factor that both keeps enough feet down and
+    leaves a swing the feet can react. Not a limit on the soil or on the gait
+    but on the two together, and the number the duty window collapses to.
+    """
+    floor = statically_stable_duty_factor(platform=platform, feet_down=feet_down)
+    coefficient = swing_demand_coefficient(
+        platform=platform,
+        strength=strength,
+        gravity_m_per_s2=gravity_m_per_s2,
+        feet_down=feet_down,
+    )
+    return (1.0 - floor) / coefficient

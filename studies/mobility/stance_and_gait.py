@@ -27,13 +27,31 @@
 # a given normal load and do not care how the load arrived. What needed the
 # stance to exist was per-foot pressure, which is what this study computes.
 #
-# And the gait trade, which is the finding. Swing acceleration goes as the
-# inverse square of swing duration, so keeping more feet on the ground shortens
-# the swing and raises the tangential demand the stance feet must supply. The
-# only gait here with a quasi-static solution on a slope is therefore the one
-# that costs the most slip on level ground. That constraint comes from statics
-# rather than from control, and it is the first thing in this project that
-# constrains how the robot walks rather than what the soil does.
+# And the gait trade, which is the finding, stated carefully because an earlier
+# draft of this study stated it wrongly. Swing acceleration goes as the inverse
+# square of swing duration, so keeping more feet on the ground shortens the
+# swing and raises the tangential demand the stance feet must supply. A duty
+# factor is therefore bounded below by leg-count arithmetic and above by
+# traction.
+#
+# The lower bound is not a discovery. Keeping three of four feet down requires a
+# duty factor of three quarters, which is arithmetic and is what every
+# statically stable crawl gait ever built runs at. That the equilibrium solver
+# rediscovers it without being told is a reason to trust the solver, and it is
+# reported that way round.
+#
+# The upper bound is not a constant. Demand goes as speed squared over one minus
+# duty squared, so the executable ceiling is 1 - k*speed with k a property of the
+# platform and the soil. Quoting a single band -- this study first quoted
+# 0.75 to 0.82 -- describes one arbitrary speed and reads as a property of the
+# robot. The window widens as the platform slows.
+#
+# What is worth carrying is where the two bounds meet. Above roughly 0.68 m/s
+# there is no duty factor that both keeps three feet down and leaves a swing the
+# feet can react, so that is a walking speed limit for statically stable gaits
+# on this soil. It comes from statics and traction together rather than from
+# control, and it is the first thing in this project that constrains how the
+# robot walks rather than what the soil does.
 #
 # On the flat-ground number being a bound rather than a value. Holding the body
 # at constant speed puts the whole swing reaction through the feet; leaving it
@@ -93,6 +111,10 @@ from eclipse.stance import (
     StanceDistribution,
     UnbalanceableStanceError,
     distribute_normal_load,
+    executable_duty_ceiling,
+    maximum_walking_speed,
+    statically_stable_duty_factor,
+    swing_demand_coefficient,
     swing_reaction,
     wave_gait,
     within_stride_slip_ratio,
@@ -413,19 +435,16 @@ def build_load_figure(platform: Platform, ground: Ground) -> Figure:
 
 
 def build_gait_figure(platform: Platform, ground: Ground) -> Figure:
-    duty_slip: list[float] = []
-    duty_feasible: list[bool] = []
-    for duty in DUTY_FACTORS:
-        gait = wave_gait(lift_order=CRAWL_LIFT_ORDER, duty_factor=float(duty))
-        try:
-            duty_slip.append(flat_slip(platform, gait, ground))
-        except ValueError:
-            duty_slip.append(math.nan)
-        duty_feasible.append(
-            gait_is_feasible_on_slope(
-                platform, gait, FEASIBILITY_TEST_SLOPE_DEGREES
-            )
-        )
+    floor = statically_stable_duty_factor(platform=platform, feet_down=3)
+    ceilings = executable_duty_ceiling(
+        platform=platform,
+        strength=ground.strength,
+        gravity_m_per_s2=LUNAR_GRAVITY,
+        speed_m_per_s=SPEEDS_M_PER_S,
+    )
+    limit = maximum_walking_speed(
+        platform=platform, strength=ground.strength, gravity_m_per_s2=LUNAR_GRAVITY
+    )
 
     crawl = wave_gait(lift_order=CRAWL_LIFT_ORDER, duty_factor=CRAWL_DUTY)
     speed_slip = [
@@ -458,76 +477,56 @@ def build_gait_figure(platform: Platform, ground: Ground) -> Figure:
         figure, axes = plt.subplots(1, 2, squeeze=False)
 
         left = axes[0][0]
-        slip = np.array(duty_slip)
-        feasible = np.array(duty_feasible)
-        finite = np.asarray(np.isfinite(slip))
+        open_window = np.asarray(ceilings > floor)
+        left.fill_between(
+            SPEEDS_M_PER_S,
+            floor,
+            np.maximum(ceilings, floor),
+            where=open_window,
+            color=ACCENT_SECONDARY,
+            alpha=0.18,
+            linewidth=0.0,
+            label="duty factors that are both stable and executable",
+        )
         left.plot(
-            DUTY_FACTORS[finite],
-            slip[finite],
+            SPEEDS_M_PER_S,
+            ceilings,
             color=ACCENT_PRIMARY,
             linewidth=1.6,
+            label="executable ceiling, 1 − k·speed",
         )
-        ceiling = (
-            float(DUTY_FACTORS[np.argmax(~finite)])
-            if bool(np.any(~finite))
-            else float(DUTY_FACTORS[-1])
+        left.axhline(
+            floor,
+            color=INK_PRIMARY,
+            linewidth=1.2,
+            linestyle=(0, (4, 3)),
         )
-        if bool(np.any(feasible)):
-            # The usable window is the intersection: statically balanced on a
-            # slope and executable at this speed. Shading past the ceiling would
-            # advertise a region where the gait cannot be run at all.
-            floor = float(DUTY_FACTORS[np.argmax(feasible)])
-            left.axvspan(
-                floor,
-                ceiling,
-                color=ACCENT_SECONDARY,
-                alpha=0.16,
-                linewidth=0.0,
-                label=(
-                    f"balances on a {FEASIBILITY_TEST_SLOPE_DEGREES:.0f}° slope "
-                    "and is executable"
-                ),
-            )
-        if bool(np.any(~finite)):
-            left.axvline(
-                ceiling, color=INK_PRIMARY, linewidth=1.1, linestyle=(0, (3, 2))
-            )
-            left.annotate(
-                f"demand exceeds capacity\nabove duty {ceiling:.2f}",
-                xy=(ceiling, 0.72),
-                xycoords=("data", "axes fraction"),
-                xytext=(-8, 0),
-                textcoords="offset points",
-                ha="right",
-                va="center",
-                color=INK_PRIMARY,
-                fontsize=7.8,
-            )
-        antiphase = float(np.argmin(np.abs(DUTY_FACTORS - 0.5)))
         left.annotate(
-            "two legs swing in anti-phase\nand cancel exactly",
-            xy=(0.5, float(slip[int(antiphase)])),
-            xytext=(6, 26),
+            f"three of four feet down needs duty {floor:.2f} — arithmetic",
+            xy=(SPEEDS_M_PER_S[0], floor),
+            xytext=(4, 5),
             textcoords="offset points",
-            ha="left",
-            color=INK_SECONDARY,
-            fontsize=7.6,
-            arrowprops={
-                "arrowstyle": "-",
-                "color": INK_MUTED,
-                "linewidth": 0.7,
-            },
+            color=INK_PRIMARY,
+            fontsize=7.8,
+        )
+        left.plot([limit], [floor], marker="o", markersize=5.0,
+                  markerfacecolor="none", color=INK_PRIMARY)
+        left.annotate(
+            f"window closes at {limit:.2f} m/s",
+            xy=(limit, floor),
+            xytext=(-8, -16),
+            textcoords="offset points",
+            ha="right",
+            color=INK_PRIMARY,
+            fontsize=8.0,
         )
         left.set_title(
-            "level-ground slip against duty factor, wave gait",
-            color=INK_SECONDARY,
-            loc="left",
+            "the duty-factor window against speed", color=INK_SECONDARY, loc="left"
         )
-        left.set_xlabel("duty factor")
-        left.set_ylabel("peak within-stride slip ratio")
-        left.set_xlim(DUTY_FACTORS[0], DUTY_FACTORS[-1])
-        left.set_ylim(0.0, 0.30)
-        left.legend(loc="upper left")
+        left.set_xlabel("walking speed (m/s)")
+        left.set_ylabel("duty factor")
+        left.set_ylim(0.60, 1.0)
+        left.legend(loc="lower left")
 
         right = axes[0][1]
         right.plot(
@@ -547,29 +546,29 @@ def build_gait_figure(platform: Platform, ground: Ground) -> Figure:
             color=INK_SECONDARY,
             fontsize=7.6,
         )
-        right.axvline(
-            platform.nominal_speed_m_per_s,
-            color=INK_MUTED,
-            linewidth=0.7,
-            linestyle=(0, (2, 3)),
-        )
         right.set_title(
-            f"level-ground slip against speed, crawl at duty {CRAWL_DUTY:.2f}",
+            f"level-ground slip against speed, duty {CRAWL_DUTY:.2f}",
             color=INK_SECONDARY,
             loc="left",
         )
         right.set_xlabel("walking speed (m/s)")
         right.set_ylabel("peak within-stride slip ratio")
-        right.set_xlim(SPEEDS_M_PER_S[0], SPEEDS_M_PER_S[-1])
         right.set_ylim(0.0, 0.30)
 
         for panel in (left, right):
+            panel.axvline(
+                platform.nominal_speed_m_per_s,
+                color=INK_MUTED,
+                linewidth=0.7,
+                linestyle=(0, (2, 3)),
+            )
+            panel.set_xlim(SPEEDS_M_PER_S[0], SPEEDS_M_PER_S[-1])
             panel.spines["top"].set_visible(False)
             panel.spines["right"].set_visible(False)
 
         figure.suptitle(
-            "The only gait that balances on a slope is the one that slips most "
-            "on the flat",
+            "The duty-factor window is a property of speed, and it closes at "
+            f"{limit:.2f} m/s",
             color=INK_PRIMARY,
             fontsize=11.5,
             x=0.066,
@@ -580,16 +579,16 @@ def build_gait_figure(platform: Platform, ground: Ground) -> Figure:
             0.066,
             0.905,
             caption(
-                "Swing acceleration goes as the inverse square of swing "
-                "duration, so keeping more feet down to stay statically "
-                "balanced shortens the swing and raises the tangential demand "
-                "the stance feet must supply. Past a duty factor the demand "
-                "exceeds capacity and the gait cannot be executed at this speed "
-                "at all, which is a different failure from a large slip.\n"
-                "Speed is the strongest lever in the model, quadratically. It is "
-                "also the second independent reason this model prefers walking "
-                "slowly, and it still has no standing-power term to push back — "
-                "a known bias, recorded in the boundary table.",
+                "Bounded below by arithmetic and above by traction. Keeping "
+                f"three of four feet down needs duty {floor:.2f}, which is what "
+                "every statically stable crawl gait runs at; the solver "
+                "rediscovers it from equilibrium, which is a check on the "
+                "solver rather than a finding about the robot.\n"
+                "The ceiling is not a constant. Swing demand goes as speed "
+                "squared over one minus duty squared, so it falls linearly with "
+                "speed and the window widens as the platform slows. Quoting one "
+                "band describes one arbitrary speed. What survives is where the "
+                "two bounds meet.",
                 width=148,
             ),
             color=INK_SECONDARY,
@@ -784,11 +783,61 @@ def build_report(
             "",
         ]
 
+    floor = statically_stable_duty_factor(platform=platform, feet_down=3)
+    coefficient = swing_demand_coefficient(
+        platform=platform, strength=ground.strength, gravity_m_per_s2=LUNAR_GRAVITY
+    )
+    speed_limit = maximum_walking_speed(
+        platform=platform, strength=ground.strength, gravity_m_per_s2=LUNAR_GRAVITY
+    )
+    lines += [
+        "# The duty-factor window, and the correction that matters most in this",
+        "# study. It is bounded below by arithmetic and above by traction, and",
+        "# only the lower bound is a constant.",
+        "#",
+        "# The floor is leg-count arithmetic: keeping three of four feet down",
+        "# needs a duty factor of three quarters, which is the textbook",
+        "# condition every statically stable crawl gait runs at. The equilibrium",
+        "# solver rediscovers it without being told, which is a check on the",
+        "# solver rather than a finding about the robot, and is reported that",
+        "# way round.",
+        "#",
+        "# The ceiling is 1 - k*speed. An earlier version of this study quoted a",
+        "# window of 0.75 to 0.82 as though it were a property of the platform;",
+        "# it is the window at one arbitrary speed, and it widens as the platform",
+        "# slows. What survives is where the two bounds meet.",
+        "[duty_window]",
+        f"stability_floor = {_format_float(floor)}",
+        'stability_floor_basis = "feet_down / legs, arithmetic"',
+        f"swing_demand_coefficient_s_per_m = {_format_float(coefficient)}",
+        'ceiling_expression = "1 - k * speed"',
+        f"maximum_walking_speed_m_per_s = {_format_float(speed_limit)}",
+        "",
+    ]
+    for speed in (0.15, 0.20, 0.25, 0.35, 0.50, 0.60, 0.68):
+        ceiling = float(
+            executable_duty_ceiling(
+                platform=platform,
+                strength=ground.strength,
+                gravity_m_per_s2=LUNAR_GRAVITY,
+                speed_m_per_s=speed,
+            )
+        )
+        lines += [
+            "[[duty_window.at_speed]]",
+            f"speed_m_per_s = {_format_float(speed)}",
+            f"ceiling = {_format_float(ceiling)}",
+            f"width = {_format_float(max(ceiling - floor, 0.0))}",
+            "open = " + str(ceiling > floor).lower(),
+            "",
+        ]
+
     lines += [
         "# The gait trade. Static feasibility on a slope and tangential demand",
         "# on the flat pull against each other through swing duration, so the",
         "# only schedule here with a quasi-static solution on a gradient is the",
-        "# one that slips most on level ground.",
+        "# one that slips most on level ground. Every value below is at the",
+        "# platform's nominal speed and moves with it.",
         "#",
         "# slope_feasible walks the whole cycle rather than sampling one instant:",
         "# a diagonal pair is a perfectly good stance on the flat and has no",

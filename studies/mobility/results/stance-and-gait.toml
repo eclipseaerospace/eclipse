@@ -106,10 +106,75 @@ mean_N = 16.382594136092685
 maximum_N = 30.66577576679978
 spread = 1.871851033606433
 
+# The duty-factor window, and the correction that matters most in this
+# study. It is bounded below by arithmetic and above by traction, and
+# only the lower bound is a constant.
+#
+# The floor is leg-count arithmetic: keeping three of four feet down
+# needs a duty factor of three quarters, which is the textbook
+# condition every statically stable crawl gait runs at. The equilibrium
+# solver rediscovers it without being told, which is a check on the
+# solver rather than a finding about the robot, and is reported that
+# way round.
+#
+# The ceiling is 1 - k*speed. An earlier version of this study quoted a
+# window of 0.75 to 0.82 as though it were a property of the platform;
+# it is the window at one arbitrary speed, and it widens as the platform
+# slows. What survives is where the two bounds meet.
+[duty_window]
+stability_floor = 0.75
+stability_floor_basis = "feet_down / legs, arithmetic"
+swing_demand_coefficient_s_per_m = 0.3679614587731554
+ceiling_expression = "1 - k * speed"
+maximum_walking_speed_m_per_s = 0.6794189827204771
+
+[[duty_window.at_speed]]
+speed_m_per_s = 0.15
+ceiling = 0.9448057811840267
+width = 0.1948057811840267
+open = true
+
+[[duty_window.at_speed]]
+speed_m_per_s = 0.2
+ceiling = 0.9264077082453689
+width = 0.1764077082453689
+open = true
+
+[[duty_window.at_speed]]
+speed_m_per_s = 0.25
+ceiling = 0.9080096353067112
+width = 0.1580096353067112
+open = true
+
+[[duty_window.at_speed]]
+speed_m_per_s = 0.35
+ceiling = 0.8712134894293956
+width = 0.12121348942939558
+open = true
+
+[[duty_window.at_speed]]
+speed_m_per_s = 0.5
+ceiling = 0.8160192706134223
+width = 0.06601927061342228
+open = true
+
+[[duty_window.at_speed]]
+speed_m_per_s = 0.6
+ceiling = 0.7792231247361068
+width = 0.029223124736106776
+open = true
+
+[[duty_window.at_speed]]
+speed_m_per_s = 0.68
+ceiling = 0.7497862080342543
+width = 0.0
+open = false
+
 # The gait trade. Static feasibility on a slope and tangential demand
 # on the flat pull against each other through swing duration, so the
 # only schedule here with a quasi-static solution on a gradient is the
-# one that slips most on level ground.
+# one that slips most on level ground. Every value below is at the
+# platform's nominal speed and moves with it.
 #
 # slope_feasible walks the whole cycle rather than sampling one instant:
 # a diagonal pair is a perfectly good stance on the flat and has no

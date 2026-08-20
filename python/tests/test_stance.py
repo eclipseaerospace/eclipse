@@ -29,6 +29,9 @@ from eclipse.stance import (
     Gait,
     UnbalanceableStanceError,
     distribute_normal_load,
+    executable_duty_ceiling,
+    maximum_walking_speed,
+    statically_stable_duty_factor,
     swing_reaction,
     wave_gait,
     within_stride_slip_ratio,
@@ -630,3 +633,135 @@ def test_the_tripod_tips_where_its_own_geometry_says(tripod: Platform) -> None:
     )
     assert not bool(np.ravel(below.any_foot_unloaded)[0])
     assert bool(np.ravel(above.any_foot_unloaded)[0])
+
+
+# --- the duty window, which is a property of speed rather than of the platform
+
+
+def test_the_stability_floor_is_arithmetic_about_leg_count(
+    quadruped: Platform, tripod: Platform
+) -> None:
+    # Three of four feet down needs three quarters. No soil, no speed, no
+    # gravity in it. Worth having as a function so a study reports it as the
+    # textbook condition rather than as something it discovered.
+    assert statically_stable_duty_factor(platform=quadruped, feet_down=3) == 0.75
+    assert statically_stable_duty_factor(platform=quadruped, feet_down=2) == 0.5
+    assert statically_stable_duty_factor(platform=tripod, feet_down=3) == 1.0
+
+
+def test_the_solver_rediscovers_the_stability_floor_from_equilibrium(
+    quadruped: Platform, crawl: Gait
+) -> None:
+    # The validation claim: nothing told the schedule that three quarters keeps
+    # three feet down, and it does.
+    phase = np.linspace(0.0, 1.0, 4001, endpoint=False)
+    floor = statically_stable_duty_factor(platform=quadruped, feet_down=3)
+
+    at_floor = wave_gait(lift_order=(2, 0, 3, 1), duty_factor=floor)
+    just_below = wave_gait(lift_order=(2, 0, 3, 1), duty_factor=floor - 0.01)
+
+    assert int(at_floor.feet_down(phase).min()) == 3
+    assert int(just_below.feet_down(phase).min()) == 2
+
+
+def test_the_closed_form_ceiling_matches_the_bisected_boundary(
+    quadruped: Platform,
+) -> None:
+    # The ceiling is derived by setting swing demand equal to capacity. This
+    # checks it against the boundary the slip solve actually refuses at, which
+    # is a different computation reaching the same place.
+    strength = MohrCoulombModel(cohesion=0.52, friction_angle_degrees=42.0)
+    mobilization = JanosiHanamotoModel(shear_deformation_modulus=0.018)
+
+    def executable(platform: Platform, duty: float) -> bool:
+        slip, _ = within_stride_slip_ratio(
+            platform=platform,
+            gait=wave_gait(lift_order=(2, 0, 3, 1), duty_factor=duty),
+            strength=strength,
+            mobilization=mobilization,
+            gravity_m_per_s2=LUNAR_GRAVITY,
+        )
+        return math.isfinite(slip)
+
+    for speed in (0.20, 0.35, 0.50, 0.60):
+        moving = Platform(
+            **{
+                **{
+                    name: getattr(quadruped, name)
+                    for name in Platform.__dataclass_fields__
+                },
+                "nominal_speed_m_per_s": speed,
+            }
+        )
+        predicted = float(
+            executable_duty_ceiling(
+                platform=moving,
+                strength=strength,
+                gravity_m_per_s2=LUNAR_GRAVITY,
+                speed_m_per_s=speed,
+            )
+        )
+        low, high = 0.75, 0.999
+        for _ in range(50):
+            middle = 0.5 * (low + high)
+            if executable(moving, middle):
+                low = middle
+            else:
+                high = middle
+        assert predicted == pytest.approx(0.5 * (low + high), abs=1e-6)
+
+
+def test_the_ceiling_is_linear_in_speed(quadruped: Platform) -> None:
+    strength = MohrCoulombModel(cohesion=0.52, friction_angle_degrees=42.0)
+    speeds = np.array([0.1, 0.2, 0.4, 0.8])
+    ceilings = executable_duty_ceiling(
+        platform=quadruped,
+        strength=strength,
+        gravity_m_per_s2=LUNAR_GRAVITY,
+        speed_m_per_s=speeds,
+    )
+    slopes = np.diff(ceilings) / np.diff(speeds)
+    assert np.allclose(slopes, slopes[0])
+    assert float(slopes[0]) < 0.0
+
+
+def test_the_window_closes_at_a_finite_walking_speed(quadruped: Platform) -> None:
+    # The number worth carrying out of rung three. Above it no duty factor both
+    # keeps three feet down and leaves a swing the feet can react.
+    strength = MohrCoulombModel(cohesion=0.52, friction_angle_degrees=42.0)
+    limit = maximum_walking_speed(
+        platform=quadruped, strength=strength, gravity_m_per_s2=LUNAR_GRAVITY
+    )
+    floor = statically_stable_duty_factor(platform=quadruped, feet_down=3)
+
+    assert 0.5 < limit < 1.0
+    for speed, expected_open in ((limit * 0.9, True), (limit * 1.1, False)):
+        ceiling = float(
+            executable_duty_ceiling(
+                platform=quadruped,
+                strength=strength,
+                gravity_m_per_s2=LUNAR_GRAVITY,
+                speed_m_per_s=speed,
+            )
+        )
+        assert (ceiling > floor) is expected_open
+
+
+def test_walking_slower_widens_the_window(quadruped: Platform) -> None:
+    strength = MohrCoulombModel(cohesion=0.52, friction_angle_degrees=42.0)
+    widths = [
+        float(
+            executable_duty_ceiling(
+                platform=quadruped,
+                strength=strength,
+                gravity_m_per_s2=LUNAR_GRAVITY,
+                speed_m_per_s=speed,
+            )
+        )
+        - statically_stable_duty_factor(platform=quadruped, feet_down=3)
+        for speed in (0.6, 0.5, 0.35, 0.25)
+    ]
+    assert all(later > earlier for earlier, later in zip(widths, widths[1:])), (
+        "the duty window is a property of speed, not of the platform; reporting "
+        "it as a fixed band overstates the constraint"
+    )
