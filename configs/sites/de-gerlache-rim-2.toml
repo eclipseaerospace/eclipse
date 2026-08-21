@@ -1,0 +1,81 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# de Gerlache Rim 2 — an Artemis III candidate landing region, as a parameter
+# vector rather than a place.
+#
+# Same move as the platform file. A site is six axes and a body; one instance
+# exists now and the other eight candidate regions become configuration rather
+# than code. The body field carries gravity and the soil parameter set, so a
+# Mars slope or a terrestrial analogue instantiates through this same file.
+#
+# Only the slope axis is populated. The other five are declared and left empty,
+# which is honest about what has been measured and stops the schema being
+# retrofitted around whichever axis happened to be first.
+#
+# On the relationship to a biome: a biome is a named environment definition and
+# a site is a named place within one. This file points at its body rather than
+# repeating it, so the soil and gravity have exactly one home.
+#
+# PROVENANCE WARNING, and it is the reason this file exists in this shape.
+# No citable centre coordinate for the Artemis III region "de Gerlache Rim 2"
+# appears in the public literature. The NASA release and the Rice et al. (2023)
+# LPSC abstract both place the region only in a figure. What is citable is
+# recorded under [region], and the terrain actually analysed is a NASA GSFC
+# product whose own extent is recorded under [terrain]. The two are consistent
+# but they are not the same claim, and the discrepancy is stated rather than
+# averaged away.
+
+schema_version = 1
+id             = "de-gerlache-rim-2"
+
+[site]
+name       = "de Gerlache Rim 2"
+body       = "moon"
+soil       = "lunar-intercrater"
+gravity    = { value = 1.62, units = "m/s^2" }
+status     = "slope_axis_only"
+
+# What NASA states about the region, quotable and without coordinates.
+[region]
+programme                 = "Artemis III candidate landing region"
+extent_km                 = 15.0
+extent_basis              = "NASA: regions are approximately 15 by 15 kilometers"
+landing_site_radius_m     = 100.0
+distance_from_pole_km     = 50.0
+distance_basis            = "NASA: closest to the pole of the candidate regions, only 50 km from the lunar south pole"
+relief_m                  = 3000.0
+relief_basis              = "NASA: rises 3,000 m above the surrounding territory"
+centre_latitude_deg       = nan
+centre_longitude_deg      = nan
+centre_status             = "no citable public source; awaiting one"
+
+# The human comparison, and the reason it is carried. Crew are limited to far
+# gentler ground than a legged platform, so the terrain a robot opens is
+# terrain crew cannot reach -- a stronger claim than reaching what they can.
+[region.crew_limit]
+maximum_slope_deg = 20.0
+traverse_range_km = 2.0
+source            = "Rice et al. (2023) LPSC, citing the Artemis III Science Definition Team report"
+
+# The terrain product actually analysed. Its extent is the authoritative
+# statement of where the numbers in the study come from.
+[terrain]
+product           = "SL2_final_adj_5mpp_surf"
+product_name      = "de Gerlache rim"
+archive           = "NASA GSFC Planetary Geodynamics Data Archive"
+manifest          = "data/terrain/manifest.toml"
+centre_latitude_deg  = -88.230
+centre_longitude_deg = -64.63
+distance_from_pole_km = 53.7
+extent_km            = 20.0
+discrepancy       = "53.7 km measured against NASA's stated 50 km for the region; the product covers a 20 km window against a stated 15 km region, so the region fits inside it with margin"
+
+# Declared and unmeasured. Listed so that a later day fills a slot rather than
+# widening a schema built around slope.
+[axes]
+entry_slope_distribution   = "populated"
+illumination_duty_cycle    = "not measured"
+cold_trap_range_and_depth  = "not measured"
+boulder_size_frequency     = "not measured"
+annual_maximum_temperature = "not measured"
+direct_to_earth_visibility = "not measured"

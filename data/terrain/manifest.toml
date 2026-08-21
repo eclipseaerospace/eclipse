@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Archived terrain products: what to fetch, from where, and how to know the
+# bytes are right.
+#
+# This file is committed and the products are not. A digital elevation model is
+# not a transcription -- there is no paper to check it against, and no amount of
+# reading it establishes provenance -- so the extension of this repository's
+# transcription policy to archived data is: record the identifier, the source,
+# the checksum and the extent, and fetch the bytes.
+#
+# The checksums are the point. An archive can republish a product under the same
+# name, and a study whose numbers moved for that reason would look like a
+# physics result. Verify before use; tools/fetch_terrain.py does.
+
+schema_version = 1
+
+[[product]]
+id            = "SL2_final_adj_5mpp_surf"
+description   = "de Gerlache rim, LOLA-derived elevation, track-adjusted"
+archive       = "NASA GSFC Planetary Geodynamics Data Archive"
+collection    = "High-Resolution LOLA Topography for Lunar South Pole Sites"
+url           = "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/SL2/SL2_final_adj_5mpp_surf.tif"
+sha256        = "16737cb5fdaa47f243715e003450deadeabc6fb1b947a5ed245d5a3fd78a2208"
+bytes         = 64025605
+retrieved     = 2026-08-21
+kind          = "elevation"
+
+[product.grid]
+columns          = 4000
+rows             = 4000
+cell_size_m      = 5.0
+sample_format    = "little-endian float32, uncompressed, one row per strip"
+projection       = "south polar stereographic"
+reference_frame  = "MOON_ME, ephemeris DE421"
+reference_radius_m = 1737400.0
+natural_origin_latitude_deg = -90.0
+vertical_pole_longitude_deg = 0.0
+scale_at_natural_origin     = 1.0
+raster_convention           = "pixel is area"
+origin_x_m       = -58500.0
+origin_y_m       = 33000.0
+elevation_datum  = "metres relative to the reference radius"
+
+# Stated by the producers, and the most consequential lines in this file.
+[product.quality]
+interpolated_pixel_fraction = 0.90
+interpolated_basis          = "producers: the fraction of interpolated 5-m pixels in these polar LDEMs is necessarily large (~90%) due to LOLA's cross-track and inter-spot spacing"
+median_rms_height_error_m   = [0.30, 0.50]
+median_rms_slope_error_deg  = [1.5, 2.5]
+track_geolocation_error_m   = [0.10, 0.20]
+
+[[product]]
+id            = "SL2_final_adj_5mpp_slp"
+description   = "de Gerlache rim, producers' own slope raster; used as a known-answer check on the slope algorithm rather than as an input"
+archive       = "NASA GSFC Planetary Geodynamics Data Archive"
+url           = "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/SL2/SL2_final_adj_5mpp_slp.tif"
+sha256        = "06d50fd00ec4d0bb00b15c6c4b8c0cff9a11afa0084c1bb4fd42e9486e815f8b"
+bytes         = 64025575
+retrieved     = 2026-08-21
+kind          = "slope"
+
+[[product]]
+id            = "Site11_final_adj_5mpp_surf"
+description   = "de Gerlache rim, the other PGDA site of that name; fetched to decide which matches the Artemis region and retained so the comparison can be rerun"
+archive       = "NASA GSFC Planetary Geodynamics Data Archive"
+url           = "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site11/Site11_final_adj_5mpp_surf.tif"
+sha256        = "58f3372c35bbd6baf38ffd5633c1c96b59bd89dbd252150581d12893a43136e5"
+bytes         = 40980806
+retrieved     = 2026-08-21
+kind          = "elevation"

@@ -1,0 +1,9 @@
+# Archive data products are fetched, never committed. This repository is public
+# forever and a DEM is a large binary from an archive that already hosts it
+# better than git can. What is committed is the manifest beside this file: the
+# product identifier, source URL, checksum and extent, which is enough to
+# reconstruct the exact bytes.
+*.tif
+*.img
+*.xyzi
+*.jp2
