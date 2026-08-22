@@ -76,7 +76,9 @@ def test_verified_models_load_and_others_are_excluded_without_raising(
     soil = load_soil(path)
     for raw_dataset in raw["dataset"]:
         dataset = soil.datasets[raw_dataset["id"]]
-        for specification in raw_dataset["model"]:
+        # A dataset need not carry contact models: the lunar file's thermal
+        # properties come from a different chapter and have none.
+        for specification in raw_dataset.get("model", ()):
             model_id = specification["id"]
             if specification["status"] == "verified":
                 assert model_id in dataset.models

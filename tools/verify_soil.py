@@ -113,7 +113,7 @@ def _plates_or_validity_span(
         return list(apparatus["plates"])
     spans = {
         model["id"]: model["validity"]["contact_half_width"]
-        for model in dataset["model"]
+        for model in dataset.get("model", ())
         if "validity" in model
     }
     if not spans:
@@ -222,7 +222,7 @@ def _write_soil(path: Path, table: Mapping[str, Any], text: str) -> list[ModelRe
     missing_block: list[str] = []
     for dataset in table["dataset"]:
         plates = _plates_or_validity_span(dataset)
-        for specification in dataset["model"]:
+        for specification in dataset.get("model", ()):
             model_id = specification["id"]
             if specification["status"] != VERIFIED_STATUS:
                 reports.append(
@@ -241,7 +241,7 @@ def _write_soil(path: Path, table: Mapping[str, Any], text: str) -> list[ModelRe
     updated = _replace_cases(text, generated)
     verified_table = tomllib.loads(updated)
     for dataset in verified_table["dataset"]:
-        for specification in dataset["model"]:
+        for specification in dataset.get("model", ()):
             model_id = specification["id"]
             if model_id not in generated:
                 continue
@@ -285,10 +285,15 @@ def _process(path: Path, write: bool) -> list[ModelReport]:
     table = tomllib.loads(text)
     if write:
         return _write_soil(path, table, text)
+    # A dataset need not carry contact models. The thermal properties in the
+    # lunar file come from a different chapter by different authors and have no
+    # pressure-sinkage cases to check, so they contribute no reports rather
+    # than raising -- a soil file may describe more than one kind of
+    # measurement.
     return [
         _check_model(specification)
         for dataset in table["dataset"]
-        for specification in dataset["model"]
+        for specification in dataset.get("model", ())
     ]
 
 

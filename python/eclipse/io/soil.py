@@ -51,6 +51,7 @@ __all__ = [
     "ValidityRange",
     "cohesion_range_kPa",
     "janosi_hanamoto_model",
+    "regolith_conductivity_W_per_m_K",
     "load_soil",
     "mohr_coulomb_model",
 ]
@@ -289,6 +290,7 @@ class Dataset:
     figures: tuple[str, ...] | None = None
     relative_density: Mapping[str, Any] | None = None
     shear_model: tuple[Mapping[str, Any], ...] | None = None
+    thermal_model: tuple[Mapping[str, Any], ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -476,3 +478,37 @@ def janosi_hanamoto_model(dataset: Dataset) -> JanosiHanamotoModel:
     entry = _shear_entry(dataset, "janosi_hanamoto", "janosi_hanamoto_model")
     modulus_cm = entry["parameters"]["shear_deformation_modulus"]["value"]
     return JanosiHanamotoModel(shear_deformation_modulus=float(modulus_cm) / 100.0)
+
+
+def regolith_conductivity_W_per_m_K(dataset: Dataset, *, depth_range_cm: str) -> float:
+    """Thermal conductivity in SI, converted from the published W/cm K.
+
+    The file stores the centimetre unit the Sourcebook printed, per the
+    transcription policy. A factor of a hundred lives here instead, in tested
+    code, because getting it wrong by that factor would change a conclusion
+    rather than a digit.
+    """
+    if dataset.thermal_model is None:
+        raise SoilFileError(
+            f"regolith_conductivity_W_per_m_K: dataset {dataset.id} carries no "
+            "thermal models"
+        )
+    for entry in dataset.thermal_model:
+        if entry.get("id") != "regolith_conductivity":
+            continue
+        for row in entry["by_depth"]["rows"]:
+            if row["depth_range_cm"] == depth_range_cm:
+                value = float(row["conductivity_W_per_cm_K"])
+                if not math.isfinite(value):
+                    raise SoilFileError(
+                        f"the {depth_range_cm} cm row records no conductivity; "
+                        f"the source states only {row['note']!r}"
+                    )
+                return value * 100.0
+        raise SoilFileError(
+            f"regolith_conductivity_W_per_m_K: no depth range {depth_range_cm!r}"
+        )
+    raise SoilFileError(
+        f"regolith_conductivity_W_per_m_K: dataset {dataset.id} has no "
+        "regolith_conductivity model"
+    )

@@ -198,6 +198,93 @@ slide_at_63_percent_mm = 18.0
 slide_at_95_percent_mm = 54.0
 
 
+
+# =====================================================================
+# Thermal properties, from a different chapter and different authors
+#
+# Chapter 3, "The Lunar Environment", not chapter 9. The measurements are
+# Apollo heat-flow probes rather than bootprints and penetrometers, so this is
+# a separate dataset with its own citation rather than more rows under
+# carrier1991. The material is the same regolith; the campaign is not.
+#
+# Why these numbers matter here. In vacuum there is no convection, so a body in
+# permanent shadow loses heat two ways only: radiation to a 3 K sky, and
+# conduction into the ground through whatever touches it. The second channel is
+# governed by the conductivity below, and lunar regolith is an extraordinarily
+# poor conductor -- the surface value is roughly a tenth that of silica aerogel.
+#
+# Transcribed as published. No unit conversion: the Sourcebook reports W/cm K
+# and that is what is stored.
+
+[[dataset]]
+id        = "vaniman1991"
+title     = "The Lunar Environment"
+authors   = ["Vaniman D", "Reedy R", "Heiken G", "Olhoeft G", "Mendell W"]
+container = "Lunar Sourcebook: A User's Guide to the Moon"
+editors   = ["Heiken GH", "Vaniman DT", "French BM"]
+publisher = "Cambridge University Press"
+year      = 1991
+chapter   = 3
+tables    = ["Section 3.5", "Section 3.6", "Section 3.6.3"]
+accessed  = 2026-08-17
+
+[dataset.conditions]
+environment          = "vacuum"
+measurement_methods  = [
+  "Apollo 15 heat-flow probe, Langseth et al. (1972)",
+  "Apollo 17 heat-flow probe, Langseth et al. (1973)",
+]
+
+# Conductivity rises steeply through the first few centimetres as bulk density
+# rises, so a foot standing on the surface sees a very different value from a
+# probe at a metre. The shallowest number is the one a contact patch engages.
+[[dataset.thermal_model]]
+id         = "regolith_conductivity"
+status     = "verified"
+fit_method = "in_situ_heat_flow_probe"
+source     = "Sections 3.6.1, 3.6.2, 3.6.3"
+
+[dataset.thermal_model.by_depth]
+rows = [
+  { depth_range_cm = "0-2",   conductivity_W_per_cm_K = 1.5e-5, sigma = nan, site = "general", note = "upper 1 to 2 cm; printed unit is wrong, see anomaly" },
+  { depth_range_cm = "2+",    conductivity_W_per_cm_K = nan,    sigma = nan, site = "general", note = "stated only as 5 to 7 times the 0-2 cm value" },
+  { depth_range_cm = "100",   conductivity_W_per_cm_K = 1.5e-4, sigma = nan, site = "Apollo 15", note = "at 1 m depth" },
+  { depth_range_cm = "probe", conductivity_W_per_cm_K = 1.72e-4, sigma = nan, site = "Apollo 17", note = "range low end, +-20%" },
+  { depth_range_cm = "probe", conductivity_W_per_cm_K = 2.95e-4, sigma = nan, site = "Apollo 17", note = "range high end, +-20%" },
+]
+relative_uncertainty          = 0.20
+increase_factor_at_2_cm       = [5.0, 7.0]
+temperature_dependence        = "acknowledged but not parameterised in this source"
+temperature_dependence_basis  = "the 40 to 45 K rise in mean temperature at 35 cm is attributed primarily to the temperature dependence of conductivity in the topmost 1 to 2 cm"
+
+[[dataset.thermal_model]]
+id         = "surface_temperature"
+status     = "verified"
+fit_method = "in_situ_thermocouple"
+source     = "Section 3.5"
+
+[dataset.thermal_model.parameters]
+maximum = { value = 374.0, units = "K", site = "Apollo 15" }
+minimum = { value =  92.0, units = "K", site = "Apollo 15" }
+
+[dataset.thermal_model.alternative]
+source  = "Glasstone (1965), Earth-based"
+maximum = { value = 390.0, units = "K" }
+minimum = { value = 104.0, units = "K" }
+
+# Not from the Sourcebook, which predates Diviner. Recorded here because a
+# polar sortie needs it and the chapter cannot supply it.
+[[dataset.thermal_model]]
+id         = "polar_shadow_temperature"
+status     = "verified"
+fit_method = "orbital_radiometry"
+source     = "Paige et al. (2010) Science 330, 479-482, doi:10.1126/science.1187726"
+
+[dataset.thermal_model.parameters]
+coldest_measured    = { value = 25.0, units = "K", note = "lowest temperatures measured in permanently shadowed regions" }
+lcross_impact_site  = { value = 38.0, units = "K", note = "estimated subsurface temperature at the LCROSS target" }
+
+
 # --- defects in the source
 
 [[anomaly]]
@@ -253,3 +340,22 @@ resolved_by = [
 ]
 trigger = "needed when specifying the target density of a physical campaign, not before"
 
+
+[[anomaly]]
+id     = "conductivity_printed_unit_wrong"
+status = "confirmed"
+detail = """
+Section 3.6.3 gives the conductivity of the upper 1 to 2 cm as
+1.5 x 10^-5 W/cm^2. That is a heat flux, not a conductivity; the dimensions
+are wrong by a length and a temperature. Sections 3.6.1 and 3.6.2 print
+conductivities in W/cm K throughout, and the neighbouring heat-flow values in
+the same paragraph are genuinely in W/cm^2, so the likeliest reading is that
+the unit was carried across from the adjacent quantity.
+
+Transcribed as 1.5e-5 with the intended unit W/cm K, on the grounds that the
+value is quoted as a conductivity, is compared to other conductivities, and is
+5 to 7 times smaller than the 2 cm value which is itself a conductivity. The
+printed unit is recorded here rather than silently repaired, and this is the
+second unit defect found in this source: Table 9.14's cohesive modulus carries
+the other.
+"""
