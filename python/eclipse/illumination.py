@@ -55,12 +55,21 @@ from eclipse.io.terrain import GeoRaster
 
 __all__ = [
     "LUNAR_OBLIQUITY_DEG",
+    "LUNATION_HOURS",
     "SOLAR_ANGULAR_RADIUS_DEG",
+    "SUBSOLAR_LATITUDE_PERIOD_HOURS",
     "HorizonMap",
     "Illumination",
+    "IlluminationSeries",
+    "ShadowTarget",
+    "contiguous_interval_hours",
     "horizon_elevation_deg",
+    "hour_angle_deg",
     "illumination_fraction",
+    "illumination_series",
+    "shadow_targets",
     "solar_elevation_deg",
+    "subsolar_latitude_deg",
 ]
 
 # The Sun's angular radius at one astronomical unit. Half a degree of disc is
@@ -71,6 +80,17 @@ SOLAR_ANGULAR_RADIUS_DEG: Final = 0.265
 # this, which is why polar illumination is a question about terrain rather than
 # about season.
 LUNAR_OBLIQUITY_DEG: Final = 1.54
+
+# The synodic month, which is the period of the solar hour angle at any point
+# on the Moon, and the natural clock for a sortie: a seven-hour round trip is a
+# hundredth of one.
+LUNATION_HOURS: Final = 29.530589 * 24.0
+
+# The sub-solar latitude oscillates within the obliquity once per year. The
+# 18.6-year nodal precession that modulates it is deliberately absent; it moves
+# the amplitude, not the period, and the amplitude is already the quantity this
+# module is least sure of.
+SUBSOLAR_LATITUDE_PERIOD_HOURS: Final = 365.25 * 24.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -305,3 +325,239 @@ def illumination_fraction(
     return Illumination(
         lit_fraction=lit, penumbral_fraction=penumbral, horizon=horizon
     )
+
+
+@dataclass(frozen=True, slots=True)
+class IlluminationSeries:
+    """Sun clearance above the horizon at each point, through time.
+
+    clearance_deg is the Sun's centre elevation minus the horizon it is up
+    against, in degrees, indexed point-major. Positive by more than the solar
+    angular radius is fully lit; negative by more than it is fully dark; between
+    the two the disc is partly clear, which near a pole covers a great deal of
+    ground and a great deal of time.
+    """
+
+    hours: NDArray[np.float64]
+    clearance_deg: NDArray[np.float64]
+    horizon: HorizonMap
+
+    @property
+    def lit(self) -> NDArray[np.bool_]:
+        return np.asarray(self.clearance_deg >= SOLAR_ANGULAR_RADIUS_DEG)
+
+    @property
+    def dark(self) -> NDArray[np.bool_]:
+        return np.asarray(self.clearance_deg <= -SOLAR_ANGULAR_RADIUS_DEG)
+
+    @property
+    def any_sunlight(self) -> NDArray[np.bool_]:
+        return np.asarray(self.clearance_deg > -SOLAR_ANGULAR_RADIUS_DEG)
+
+
+def subsolar_latitude_deg(hours: NDArray[np.float64]) -> NDArray[np.float64]:
+    """Sub-solar latitude, oscillating within the obliquity once per year."""
+    return np.asarray(
+        LUNAR_OBLIQUITY_DEG
+        * np.sin(2.0 * np.pi * hours / SUBSOLAR_LATITUDE_PERIOD_HOURS)
+    )
+
+
+def hour_angle_deg(hours: NDArray[np.float64]) -> NDArray[np.float64]:
+    """Solar hour angle, sweeping once per synodic month."""
+    return np.asarray(360.0 * hours / LUNATION_HOURS)
+
+
+def illumination_series(
+    *,
+    horizon: HorizonMap,
+    latitude_deg: NDArray[np.float64] | float,
+    north_azimuth_deg: NDArray[np.float64],
+    hours: NDArray[np.float64],
+) -> IlluminationSeries:
+    """Sun clearance at each point over a given run of hours.
+
+    illumination_fraction answers what share of a year a point sees sunlight.
+    This answers when, which is a different question and the one a schedule
+    turns on: a sortie shorter than a lunation is cold or not depending on
+    where in the cycle it departs.
+
+    The two do not have to agree exactly and should not be expected to.
+    illumination_fraction samples the sub-solar latitude uniformly in angle;
+    time spends longer near the extremes of a sinusoid than near the middle, so
+    a long enough series weights the seasons differently. Which is the more
+    physical weighting is not in question -- this one is -- but the fraction is
+    a summary and this is a history, and they are reported separately for that
+    reason.
+    """
+    points = horizon.elevation_deg.shape[0]
+    latitude = np.broadcast_to(
+        np.asarray(latitude_deg, dtype=np.float64), (points,)
+    )
+    declination = subsolar_latitude_deg(hours)
+    angle = hour_angle_deg(hours)
+    wrapped_azimuth = np.concatenate([horizon.azimuth_deg, [360.0]])
+
+    clearance = np.zeros((points, hours.size), dtype=np.float64)
+    for index in range(points):
+        elevation = solar_elevation_deg(
+            latitude_deg=float(latitude[index]),
+            subsolar_latitude_deg=declination,
+            hour_angle_deg=angle,
+        )
+        azimuth = _solar_azimuth_deg(
+            latitude_deg=float(latitude[index]),
+            subsolar_latitude_deg=declination,
+            hour_angle_deg=angle,
+            elevation_deg=elevation,
+        )
+        blocked = np.interp(
+            np.mod(azimuth + north_azimuth_deg[index], 360.0),
+            wrapped_azimuth,
+            np.concatenate(
+                [horizon.elevation_deg[index], horizon.elevation_deg[index, :1]]
+            ),
+        )
+        clearance[index] = elevation - blocked
+
+    return IlluminationSeries(
+        hours=hours, clearance_deg=clearance, horizon=horizon
+    )
+
+
+def contiguous_interval_hours(
+    *, mask: NDArray[np.bool_], hours: NDArray[np.float64]
+) -> NDArray[np.float64]:
+    """Durations of the runs of True in mask, dropping any that touch an end.
+
+    A run reaching either end of the window is censored -- the window stopped
+    it, not the terrain -- so reporting its length would understate it and
+    reporting it as complete would be wrong. Sweep more lunations if the
+    dropped runs matter.
+    """
+    if mask.ndim != 1:
+        raise ValueError(
+            "contiguous_interval_hours takes one point's mask at a time; "
+            f"got an array of {mask.ndim} dimensions with shape {mask.shape}"
+        )
+    if mask.size != hours.size:
+        raise ValueError(
+            "mask and hours must describe the same samples; got "
+            f"{mask.size} mask entries against {hours.size} hours"
+        )
+    if mask.size == 0 or not bool(mask.any()):
+        return np.zeros(0, dtype=np.float64)
+
+    padded = np.concatenate([[False], mask, [False]])
+    change = np.diff(padded.astype(np.int8))
+    starts = np.flatnonzero(change == 1)
+    stops = np.flatnonzero(change == -1) - 1
+    keep = (starts > 0) & (stops < mask.size - 1)
+    step = float(np.mean(np.diff(hours))) if hours.size > 1 else 0.0
+    return np.asarray(
+        hours[stops[keep]] - hours[starts[keep]] + step, dtype=np.float64
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ShadowTarget:
+    """One candidate destination in permanent shadow, and why it was chosen.
+
+    Which shadow a mission visits is a design question rather than a modelling
+    detail: the nearest is cheapest, the largest gives the most ground to work
+    over, and the deepest is a different undertaking. Naming them separately is
+    what lets the three be priced against each other instead of one being
+    assumed.
+    """
+
+    id: str
+    row: int
+    column: int
+    distance_km: float
+    drop_m: float
+    region_area_km2: float
+
+
+def shadow_targets(
+    raster: GeoRaster,
+    *,
+    start: tuple[int, int],
+    rows: NDArray[np.int_],
+    columns: NDArray[np.int_],
+    any_sunlight_fraction: NDArray[np.float64],
+) -> dict[str, ShadowTarget]:
+    """Nearest, largest and deepest permanent shadow, from an illumination grid.
+
+    rows and columns index the raster at the sampled points and carry the grid
+    shape; any_sunlight_fraction is the illumination at those same points.
+    Regions are four-connected components of the fully dark cells. The largest
+    is entered at its nearest member rather than its centroid, because a
+    platform walks to the edge of a shadow and not into the middle of it.
+    """
+    if rows.shape != columns.shape or rows.shape != any_sunlight_fraction.shape:
+        raise ValueError(
+            "rows, columns and any_sunlight_fraction must share a shape; got "
+            f"{rows.shape}, {columns.shape} and {any_sunlight_fraction.shape}"
+        )
+    if rows.ndim != 2:
+        raise ValueError(
+            "shadow_targets takes a two-dimensional sampling of the raster so "
+            f"that regions are connected; got {rows.ndim} dimensions"
+        )
+    dark = any_sunlight_fraction <= 0.0
+    if not bool(dark.any()):
+        raise ValueError(
+            "no fully shadowed cell on the illumination grid; there is nowhere "
+            "for a cold-trap sortie to go"
+        )
+
+    cell = raster.cell_size_m
+    distance_m = np.hypot((rows - start[0]) * cell, (columns - start[1]) * cell)
+    drop = raster.values[start[0], start[1]] - raster.values[rows, columns]
+
+    label = np.full(dark.shape, -1, dtype=int)
+    count = 0
+    for i in range(dark.shape[0]):
+        for j in range(dark.shape[1]):
+            if dark[i, j] and label[i, j] < 0:
+                stack = [(i, j)]
+                label[i, j] = count
+                while stack:
+                    a, b = stack.pop()
+                    for da, db in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                        p, q = a + da, b + db
+                        if (
+                            0 <= p < dark.shape[0]
+                            and 0 <= q < dark.shape[1]
+                            and dark[p, q]
+                            and label[p, q] < 0
+                        ):
+                            label[p, q] = count
+                            stack.append((p, q))
+                count += 1
+    sizes = np.array([int((label == k).sum()) for k in range(count)])
+    sample_area_km2 = (rows[1, 0] - rows[0, 0]) ** 2 * cell**2 / 1e6
+
+    def make(identifier: str, index: tuple[int, int]) -> ShadowTarget:
+        return ShadowTarget(
+            id=identifier,
+            row=int(rows[index]),
+            column=int(columns[index]),
+            distance_km=float(distance_m[index]) / 1000.0,
+            drop_m=float(drop[index]),
+            region_area_km2=float(sizes[int(label[index])]) * sample_area_km2,
+        )
+
+    nearest = np.unravel_index(
+        int(np.argmin(np.where(dark, distance_m, np.inf))), dark.shape
+    )
+    deepest = np.unravel_index(
+        int(np.argmax(np.where(dark, drop, -np.inf))), dark.shape
+    )
+    members = np.argwhere(label == int(np.argmax(sizes)))
+    entry = members[int(np.argmin([distance_m[a, b] for a, b in members]))]
+    return {
+        "nearest": make("nearest", (int(nearest[0]), int(nearest[1]))),
+        "largest": make("largest", (int(entry[0]), int(entry[1]))),
+        "deepest": make("deepest", (int(deepest[0]), int(deepest[1]))),
+    }

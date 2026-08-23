@@ -37,6 +37,19 @@ array_area_m2 = 0.5
 array_efficiency = 0.3
 average_charge_W = 185.37324074074075
 
+# The horizon search starts at a stand-off because starting at one cell
+# reads the interpolator rather than the terrain. The destination is a
+# PSR from 5 m to 100 m; at 250 m the search has begun discarding the
+# near wall of the depression, which is real relief, and the point picks
+# up sunlight. That last row is about the method, not the ground.
+[horizon_standoff]
+used_m = 50.0
+swept_m = [5.0, 25.0, 50.0, 100.0, 250.0]
+charge_point_horizon_max_deg = [-0.018784324088017768, -0.0187818502223509, -0.6635292745259228, -0.6612344005482914, -1.148528297621597]
+charge_point_lit_fraction = [0.8876543209876544, 0.8950617283950617, 0.9080246913580248, 0.912962962962963, 0.9685185185185186]
+destination_horizon_max_deg = [26.65779185303143, 20.69658613331674, 17.570744869708708, 13.311087358231172, 6.092890583757727]
+destination_lit_fraction = [0.0, 0.0, 0.0, 0.0, 0.03209876543209877]
+
 [route_illumination]
 shadowed_fraction_of_route = 0.11764705882352941
 dwell_hours = 4.0

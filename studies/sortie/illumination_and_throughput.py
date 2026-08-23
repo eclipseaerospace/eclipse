@@ -127,10 +127,11 @@ from eclipse.analysis.style import (
 from eclipse.illumination import (
     LUNAR_OBLIQUITY_DEG,
     SOLAR_ANGULAR_RADIUS_DEG,
-    HorizonMap,
     Illumination,
+    ShadowTarget,
     horizon_elevation_deg,
     illumination_fraction,
+    shadow_targets,
 )
 from eclipse.io.platform import load_platform
 from eclipse.io.soil import janosi_hanamoto_model, load_soil, mohr_coulomb_model
@@ -169,7 +170,6 @@ ARRAY_AREA_M2: Final = 0.5
 ARRAY_EFFICIENCY: Final = 0.30
 SOLAR_CONSTANT_W_PER_M2: Final = 1361.0
 HOURS_PER_WEEK: Final = 168.0
-LUNATION_HOURS: Final = 29.53 * 24.0
 
 # From Day 8, at an effective emissivity of 0.05.
 INSULATED_SURVIVAL_W: Final = 11.8
@@ -248,23 +248,6 @@ def illuminate(
 
 
 @dataclass(frozen=True, slots=True)
-class Target:
-    """One candidate destination, and why it was chosen.
-
-    Which permanent shadow to visit is a genuine mission-design question rather
-    than a modelling detail: the nearest is cheapest, the largest gives the most
-    ground to work over, and the deepest is a different kind of expedition.
-    """
-
-    id: str
-    row: int
-    column: int
-    distance_km: float
-    drop_m: float
-    region_area_km2: float
-
-
-@dataclass(frozen=True, slots=True)
 class TargetStyle:
     color: str
     dash: Any
@@ -277,83 +260,6 @@ TARGET_STYLE: Final[dict[str, TargetStyle]] = {
     "largest": TargetStyle(ACCENT_PRIMARY, (0, (5, 2)), (-14.0, 8.0), "right"),
     "deepest": TargetStyle(INK_MUTED, (0, (1.6, 1.6)), (14.0, 10.0), "left"),
 }
-
-
-def find_targets(
-    setting_raster: GeoRaster,
-    *,
-    crest: tuple[int, int],
-    grid_rows: NDArray[np.int_],
-    grid_columns: NDArray[np.int_],
-    lit: NDArray[np.float64],
-) -> dict[str, Target]:
-    """Nearest, largest and deepest permanent shadow, from the illumination map.
-
-    Regions are four-connected components of the fully dark cells. The largest
-    one is entered at its nearest member rather than its centroid, because a
-    platform walks to the edge of a shadow and not to the middle of it.
-    """
-    dark = lit <= 0.0
-    if not bool(dark.any()):
-        raise ValueError(
-            "no fully shadowed cell on the illumination grid; there is nowhere "
-            "for this mission concept to go"
-        )
-    cell = setting_raster.cell_size_m
-    distance_m = np.hypot(
-        (grid_rows - crest[0]) * cell, (grid_columns - crest[1]) * cell
-    )
-    elevation = setting_raster.values[grid_rows, grid_columns]
-    drop = setting_raster.values[crest[0], crest[1]] - elevation
-
-    label = np.full(dark.shape, -1, dtype=int)
-    count = 0
-    for i in range(dark.shape[0]):
-        for j in range(dark.shape[1]):
-            if dark[i, j] and label[i, j] < 0:
-                stack = [(i, j)]
-                label[i, j] = count
-                while stack:
-                    a, b = stack.pop()
-                    for da, db in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                        p, q = a + da, b + db
-                        if (
-                            0 <= p < dark.shape[0]
-                            and 0 <= q < dark.shape[1]
-                            and dark[p, q]
-                            and label[p, q] < 0
-                        ):
-                            label[p, q] = count
-                            stack.append((p, q))
-                count += 1
-    sizes = np.array([int((label == k).sum()) for k in range(count)])
-    cell_area_km2 = (grid_rows[1, 0] - grid_rows[0, 0]) ** 2 * cell**2 / 1e6
-
-    def make(identifier: str, index: tuple[int, int]) -> Target:
-        region = int(label[index])
-        return Target(
-            id=identifier,
-            row=int(grid_rows[index]),
-            column=int(grid_columns[index]),
-            distance_km=float(distance_m[index]) / 1000.0,
-            drop_m=float(drop[index]),
-            region_area_km2=float(sizes[region]) * cell_area_km2,
-        )
-
-    nearest = np.unravel_index(
-        int(np.argmin(np.where(dark, distance_m, np.inf))), dark.shape
-    )
-    deepest = np.unravel_index(
-        int(np.argmax(np.where(dark, drop, -np.inf))), dark.shape
-    )
-    biggest = int(np.argmax(sizes))
-    members = np.argwhere(label == biggest)
-    entry = members[int(np.argmin([distance_m[a, b] for a, b in members]))]
-    return {
-        "nearest": make("nearest", (int(nearest[0]), int(nearest[1]))),
-        "largest": make("largest", (int(entry[0]), int(entry[1]))),
-        "deepest": make("deepest", (int(deepest[0]), int(deepest[1]))),
-    }
 
 
 @dataclass(frozen=True, slots=True)
@@ -426,6 +332,44 @@ def load_setting(destination: tuple[int, int] | None = None) -> Setting:
         strength=strength,
         mobilization=mobilization,
     )
+
+
+def sweep_standoff(
+    raster: GeoRaster, *, rows: NDArray[np.int_], columns: NDArray[np.int_]
+) -> tuple[tuple[float, float, float, float, float], ...]:
+    """Horizon and illumination against the range the horizon search starts at.
+
+    The stand-off exists because the first search started one cell out, where a
+    2.6 m rise subtends 27 degrees. On a grid that is roughly 90% interpolated
+    at 5 m spacing that is the interpolator's own tilt, not a horizon, and it
+    nearly became a headline. Sweeping the stand-off is the evidence that the
+    conclusion does not rest on it.
+    """
+    swept = []
+    for standoff in STANDOFF_SWEEP_M:
+        horizon = horizon_elevation_deg(
+            raster,
+            rows=rows,
+            columns=columns,
+            azimuths=HORIZON_AZIMUTHS,
+            samples_along_ray=HORIZON_SAMPLES,
+            minimum_range_m=standoff,
+        )
+        fraction = illumination_fraction(
+            horizon=horizon,
+            latitude_deg=latitudes(raster, rows, columns),
+            north_azimuth_deg=north_azimuth_deg(raster, rows, columns),
+        )
+        swept.append(
+            (
+                float(standoff),
+                float(horizon.elevation_deg[0].max()),
+                float(fraction.any_sunlight_fraction[0]),
+                float(horizon.elevation_deg[1].max()),
+                float(fraction.any_sunlight_fraction[1]),
+            )
+        )
+    return tuple(swept)
 
 
 def average_charge_W(lit_fraction: float) -> float:
@@ -509,7 +453,7 @@ def sweep_speed(
 class Route:
     """One target, the walk to it, and what that walk costs across speed."""
 
-    target: Target
+    target: ShadowTarget
     setting: Setting
     sampled_index: NDArray[np.int_]
     illumination: Illumination
@@ -544,7 +488,7 @@ class Route:
         return self.locomotion_Wh + self.survival_Wh
 
 
-def walk_to(target: Target) -> Route:
+def walk_to(target: ShadowTarget) -> Route:
     setting = load_setting(destination=(target.row, target.column))
     spacing = float(setting.transect.distance_m[-1]) / (setting.route_rows.size - 1)
     stride = max(1, int(round(ROUTE_ILLUMINATION_SPACING_M / spacing)))
@@ -1162,6 +1106,7 @@ def build_report(
     routes: dict[str, Route],
     grid: Illumination,
     probes: Illumination,
+    standoff: tuple[tuple[float, float, float, float, float], ...],
 ) -> str:
     chosen = routes[CHOSEN_TARGET]
     crest_lit = float(probes.any_sunlight_fraction[0])
@@ -1218,6 +1163,29 @@ def build_report(
         f"array_area_m2 = {_format_float(ARRAY_AREA_M2)}",
         f"array_efficiency = {_format_float(ARRAY_EFFICIENCY)}",
         f"average_charge_W = {_format_float(charge_W)}",
+        "",
+        "# The horizon search starts at a stand-off because starting at one cell",
+        "# reads the interpolator rather than the terrain. The destination is a",
+        "# PSR from 5 m to 100 m; at 250 m the search has begun discarding the",
+        "# near wall of the depression, which is real relief, and the point picks",
+        "# up sunlight. That last row is about the method, not the ground.",
+        "[horizon_standoff]",
+        f"used_m = {_format_float(HORIZON_STANDOFF_M)}",
+        "swept_m = ["
+        + ", ".join(_format_float(row[0]) for row in standoff)
+        + "]",
+        "charge_point_horizon_max_deg = ["
+        + ", ".join(_format_float(row[1]) for row in standoff)
+        + "]",
+        "charge_point_lit_fraction = ["
+        + ", ".join(_format_float(row[2]) for row in standoff)
+        + "]",
+        "destination_horizon_max_deg = ["
+        + ", ".join(_format_float(row[3]) for row in standoff)
+        + "]",
+        "destination_lit_fraction = ["
+        + ", ".join(_format_float(row[4]) for row in standoff)
+        + "]",
         "",
         "[route_illumination]",
         f"shadowed_fraction_of_route = {_format_float(dark_fraction)}",
@@ -1373,12 +1341,12 @@ def main(argv: list[str] | None = None) -> int:
     grid = illuminate(scout.raster, grid_rows.ravel(), grid_columns.ravel())
     lit_map = grid.any_sunlight_fraction.reshape(shape)
 
-    targets = find_targets(
+    targets = shadow_targets(
         scout.raster,
-        crest=scout.crest,
-        grid_rows=grid_rows,
-        grid_columns=grid_columns,
-        lit=lit_map,
+        start=scout.crest,
+        rows=grid_rows,
+        columns=grid_columns,
+        any_sunlight_fraction=lit_map,
     )
     for target in targets.values():
         print(
@@ -1398,6 +1366,11 @@ def main(argv: list[str] | None = None) -> int:
         np.array([chosen.setting.crest[1], chosen.target.column]),
     )
     crest_lit = float(probes.any_sunlight_fraction[0])
+    standoff = sweep_standoff(
+        chosen.setting.raster,
+        rows=np.array([chosen.setting.crest[0], chosen.target.row]),
+        columns=np.array([chosen.setting.crest[1], chosen.target.column]),
+    )
 
     arguments.figure_directory.mkdir(parents=True, exist_ok=True)
     arguments.report.parent.mkdir(parents=True, exist_ok=True)
@@ -1413,7 +1386,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"wrote {path.relative_to(REPOSITORY_ROOT)}")
 
     arguments.report.write_text(
-        build_report(routes, grid, probes), encoding="utf-8"
+        build_report(routes, grid, probes, standoff), encoding="utf-8"
     )
     print(f"wrote {arguments.report.relative_to(REPOSITORY_ROOT)}")
 

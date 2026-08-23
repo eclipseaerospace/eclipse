@@ -20,10 +20,17 @@ import pytest
 
 from eclipse.illumination import (
     LUNAR_OBLIQUITY_DEG,
+    LUNATION_HOURS,
     SOLAR_ANGULAR_RADIUS_DEG,
+    SUBSOLAR_LATITUDE_PERIOD_HOURS,
+    contiguous_interval_hours,
     horizon_elevation_deg,
+    hour_angle_deg,
     illumination_fraction,
+    illumination_series,
+    shadow_targets,
     solar_elevation_deg,
+    subsolar_latitude_deg,
 )
 from eclipse.io.terrain import GeoRaster
 
@@ -361,3 +368,178 @@ def test_a_batch_latitude_is_broadcast_when_it_is_one_value() -> None:
     )
     assert np.allclose(scalar.lit_fraction, array.lit_fraction)
     assert np.allclose(scalar.penumbral_fraction, array.penumbral_fraction)
+
+
+# --- illumination as a history rather than a fraction
+
+
+def test_the_hour_angle_closes_once_per_lunation() -> None:
+    assert float(hour_angle_deg(np.array([LUNATION_HOURS]))[0]) == pytest.approx(360.0)
+    assert float(hour_angle_deg(np.array([0.0]))[0]) == pytest.approx(0.0)
+
+
+def test_the_subsolar_latitude_stays_inside_the_obliquity() -> None:
+    hours = np.linspace(0.0, SUBSOLAR_LATITUDE_PERIOD_HOURS, 2001)
+    declination = subsolar_latitude_deg(hours)
+    assert float(np.abs(declination).max()) == pytest.approx(LUNAR_OBLIQUITY_DEG)
+    assert float(declination[0]) == pytest.approx(0.0)
+
+
+def test_a_year_of_series_agrees_with_the_fraction_it_summarizes() -> None:
+    # Not exactly, and the difference is the point: illumination_fraction
+    # samples declination uniformly in angle while time spends longer near the
+    # extremes of a sinusoid. A year is long enough that the two should still
+    # land within a point or two of each other, and a larger gap would mean one
+    # of them has the geometry wrong rather than the weighting.
+    values = np.zeros((240, 240))
+    values[40:70, :] = 220.0
+    raster = raster_from(values, cell_size_m=40.0)
+    rows = np.array([160])
+    columns = np.array([120])
+    horizon = horizon_elevation_deg(
+        raster, rows=rows, columns=columns, azimuths=36, samples_along_ray=60
+    )
+    north = np.array([0.0])
+    fraction = illumination_fraction(
+        horizon=horizon, latitude_deg=-88.6, north_azimuth_deg=north
+    )
+    series = illumination_series(
+        horizon=horizon,
+        latitude_deg=-88.6,
+        north_azimuth_deg=north,
+        hours=np.arange(0.0, SUBSOLAR_LATITUDE_PERIOD_HOURS, 0.5),
+    )
+    assert float(series.any_sunlight[0].mean()) == pytest.approx(
+        float(fraction.any_sunlight_fraction[0]), abs=0.03
+    )
+
+
+def test_permanent_shadow_in_the_fraction_is_permanent_in_the_series() -> None:
+    values = np.zeros((240, 240))
+    values[110:130, 110:130] = -3000.0
+    raster = raster_from(values, cell_size_m=20.0)
+    rows = np.array([120])
+    columns = np.array([120])
+    horizon = horizon_elevation_deg(
+        raster, rows=rows, columns=columns, azimuths=36, samples_along_ray=80
+    )
+    north = np.array([0.0])
+    fraction = illumination_fraction(
+        horizon=horizon, latitude_deg=-88.5, north_azimuth_deg=north
+    )
+    series = illumination_series(
+        horizon=horizon,
+        latitude_deg=-88.5,
+        north_azimuth_deg=north,
+        hours=np.arange(0.0, SUBSOLAR_LATITUDE_PERIOD_HOURS, 1.0),
+    )
+    assert float(fraction.any_sunlight_fraction[0]) == 0.0
+    assert not bool(series.any_sunlight[0].any())
+
+
+def test_the_three_states_of_the_series_partition_every_sample() -> None:
+    raster = raster_from(np.zeros((200, 200)), cell_size_m=20.0)
+    horizon = horizon_elevation_deg(
+        raster,
+        rows=np.array([100, 60]),
+        columns=np.array([100, 60]),
+        azimuths=24,
+        samples_along_ray=40,
+    )
+    series = illumination_series(
+        horizon=horizon,
+        latitude_deg=np.array([-88.5, -89.0]),
+        north_azimuth_deg=np.array([0.0, 137.0]),
+        hours=np.arange(0.0, LUNATION_HOURS, 0.5),
+    )
+    partly = series.any_sunlight & ~series.lit
+    assert bool((series.lit | partly | series.dark).all())
+    assert not bool((series.lit & series.dark).any())
+
+
+# --- run lengths, where the window is the thing to be careful about
+
+
+def test_runs_touching_either_end_of_the_window_are_dropped() -> None:
+    hours = np.arange(10.0)
+    mask = np.array([1, 1, 0, 1, 1, 1, 0, 0, 1, 1], dtype=bool)
+    lengths = contiguous_interval_hours(mask=mask, hours=hours)
+    assert lengths.tolist() == [3.0]
+
+
+def test_a_run_length_counts_the_step_it_occupies() -> None:
+    hours = np.arange(0.0, 5.0, 0.25)
+    mask = np.zeros(hours.size, dtype=bool)
+    mask[4:8] = True
+    assert float(contiguous_interval_hours(mask=mask, hours=hours)[0]) == pytest.approx(
+        1.0
+    )
+
+
+def test_an_always_true_mask_has_no_measurable_run() -> None:
+    hours = np.arange(10.0)
+    assert contiguous_interval_hours(
+        mask=np.ones(10, dtype=bool), hours=hours
+    ).size == 0
+
+
+def test_run_lengths_refuse_a_mask_that_is_not_one_point() -> None:
+    with pytest.raises(ValueError, match="one point's mask at a time"):
+        contiguous_interval_hours(
+            mask=np.ones((2, 5), dtype=bool), hours=np.arange(5.0)
+        )
+
+
+# --- picking a destination out of an illumination grid
+
+
+def test_the_nearest_shadow_is_nearer_than_the_largest_and_the_deepest() -> None:
+    values = np.zeros((12, 12))
+    values[2, 2] = -50.0
+    values[8:11, 8:11] = -400.0
+    raster = raster_from(values, cell_size_m=100.0)
+    rows, columns = np.meshgrid(np.arange(12), np.arange(12), indexing="ij")
+    sunlight = np.ones((12, 12))
+    sunlight[2, 2] = 0.0
+    sunlight[8:11, 8:11] = 0.0
+    targets = shadow_targets(
+        raster,
+        start=(0, 0),
+        rows=rows,
+        columns=columns,
+        any_sunlight_fraction=sunlight,
+    )
+    assert (targets["nearest"].row, targets["nearest"].column) == (2, 2)
+    assert targets["deepest"].drop_m == pytest.approx(400.0)
+    assert targets["largest"].region_area_km2 > targets["nearest"].region_area_km2
+    assert targets["nearest"].distance_km <= targets["largest"].distance_km
+
+
+def test_the_largest_shadow_is_entered_at_its_near_edge() -> None:
+    values = np.zeros((12, 12))
+    values[6:12, 6:12] = -100.0
+    raster = raster_from(values, cell_size_m=100.0)
+    rows, columns = np.meshgrid(np.arange(12), np.arange(12), indexing="ij")
+    sunlight = np.ones((12, 12))
+    sunlight[6:12, 6:12] = 0.0
+    largest = shadow_targets(
+        raster,
+        start=(0, 0),
+        rows=rows,
+        columns=columns,
+        any_sunlight_fraction=sunlight,
+    )["largest"]
+    assert (largest.row, largest.column) == (6, 6)
+
+
+def test_a_fully_lit_grid_has_nowhere_to_send_a_sortie() -> None:
+    raster = raster_from(np.zeros((8, 8)), cell_size_m=100.0)
+    rows, columns = np.meshgrid(np.arange(8), np.arange(8), indexing="ij")
+    with pytest.raises(ValueError, match="no fully shadowed cell"):
+        shadow_targets(
+            raster,
+            start=(0, 0),
+            rows=rows,
+            columns=columns,
+            any_sunlight_fraction=np.ones((8, 8)),
+        )
