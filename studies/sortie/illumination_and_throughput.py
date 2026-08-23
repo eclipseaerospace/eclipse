@@ -9,7 +9,7 @@
 # priced survival for a shadow whose duration was assumed. This settles both
 # from the same measured terrain, and then asks what actually limits throughput.
 #
-# Four results.
+# Five results.
 #
 # The destination is a permanently shadowed region. The route's endpoint sees no
 # sunlight at any point in a year of lunations, because it sits under a horizon
@@ -17,27 +17,68 @@
 # and it closes in the favourable direction: de Gerlache's own interior is
 # outside the window, but the route still ends somewhere genuinely dark.
 #
-# The rim crest is a viable charge point. It is lit about four fifths of the
+# The rim crest is a viable charge point. It is lit about nine tenths of the
 # time, with a horizon that falls away in every direction. Which makes the
 # truncation caveat one-sided and worth stating precisely: rays leaving the
 # window are treated as clear sky, so extra terrain can only raise a horizon.
 # Darkness is therefore robust and sunlight is an upper bound. The destination
-# being a PSR survives any wider search; the rim's four fifths does not.
+# being a PSR survives any wider search; the rim's nine tenths does not.
 #
 # Charge does not bind. A modest array at the rim recharges a sortie's battery
-# in hours against a sortie that takes days, so throughput is limited by how
-# long the walk takes and not by how long the waiting takes.
+# in hours against a sortie that also takes hours, so throughput is limited by
+# how long the walk takes and not by how long the waiting takes.
 #
-# And the fourth is the one worth having. Sortie energy has a minimum in walking
-# speed, because the two dominant terms pull opposite ways: swing work per metre
-# rises as the square of speed, while survival energy is a power times a
-# duration and so falls as one over it. Total energy is least around a third of
-# a metre per second. Throughput peaks somewhere else entirely, near twice that,
-# because a faster sortie is a shorter one even when it costs more -- until slip
-# runs away near the gait limit and throughput falls again.
+# Which shadow to visit is a mission decision, and it is now priced rather than
+# argued. The nearest permanent shadow is 2.8 km out and costs 176 Wh round
+# trip; the largest is 3.9 km and 234 Wh, for thirteen times the ground to work
+# over; the deepest is 19.8 km and 908 Wh, which is a different undertaking
+# entirely. All three are computed and all three are drawn, because the point of
+# the machinery is to answer that question rather than to assume it.
 #
-# So there is no single best speed, and saying which one is being optimised is
-# now a mission decision rather than a modelling detail.
+# And the fifth is the one worth having, in a narrower form than it first got
+# stated. Sortie energy has a minimum in walking speed, because swing work per
+# metre rises as the square of speed while survival is a power times a duration
+# and falls with it. But most of that duration is a fixed dwell, so the falling
+# term is weak, the minimum is shallow, and it exists at all only where the
+# shadowed share of the walk is large enough -- which across these three routes
+# means only on the shortest. Throughput peaks elsewhere, at 0.60 m/s against
+# 0.16, and crossing between them costs about twice the energy for about twice
+# the sorties.
+#
+# So there is still no single best speed on the route that gets flown, and
+# saying which one is being optimised is a mission decision rather than a
+# modelling detail. It is a smaller effect than the first version claimed.
+#
+# On the route, because the first version of this study got it wrong in a way
+# worth recording. It ran from the highest cell in the window to the lowest --
+# corner to corner, twenty-five kilometres, three and a half thousand metres of
+# descent, fifty-six hours of walking. That is not a sortie, it is the expedition
+# this project ruled out on its first day when it rejected a descent to
+# Shackleton's floor, and it had been rebuilt at de Gerlache without anyone
+# noticing.
+#
+# The mission concept is charge on a lit rim, drop into a nearby cold trap, come
+# back, and candidate regions are scoped on having permanent shadow within
+# roughly two kilometres. So the route criterion is nearest permanent shadow
+# from the best charge point, not deepest ground in the window -- and the
+# illumination map has plenty of darker ground far closer than the far corner.
+#
+# The old route did earn its keep as an instrument test: full elevation range,
+# every slope regime, maximum stress on the integration. It proved the
+# machinery. It was not a mission.
+#
+# One defect found and fixed while adding the second and third routes, worth
+# recording because of how it hid. illumination_fraction took a single latitude
+# for a whole batch of points, and this runner passed the batch mean. A twenty
+# kilometre window near the pole spans two thirds of a degree of latitude
+# against an obliquity of 1.54, so the approximation was not small -- and it
+# made a point's illumination depend on which other points were computed
+# alongside it. The crest read 87.7% when it was probed with the far corner and
+# 90.4% when it was probed with the nearest shadow, for no reason on the ground.
+# Nothing caught it while one route was computed, because the number was only
+# ever wrong the same way. Three routes made it inconsistent instead of merely
+# biased, and inconsistency is visible. Latitude is now per point and the crest
+# is 90.8% whoever it is measured beside.
 #
 # Three axes of six. Comms and cold-trap range remain empty, and sunlight
 # falling on the platform at the rim would change the thermal problem entirely
@@ -142,8 +183,16 @@ HORIZON_SAMPLES: Final = 140
 # Above about 100 m it starts discarding real local terrain instead.
 HORIZON_STANDOFF_M: Final = 50.0
 STANDOFF_SWEEP_M: Final = (5.0, 25.0, 50.0, 100.0, 250.0)
-ROUTE_SAMPLES: Final = 600
-ROUTE_ILLUMINATION_STRIDE: Final = 6
+ROUTE_SAMPLES: Final = 400
+
+# How long the platform works at the destination. Survival power multiplies the
+# hours spent cold, and on a short sortie through lit ground those are the dwell
+# hours rather than the whole traverse -- which is where the first version of
+# this study went wrong by a factor of ten.
+DWELL_HOURS: Final = 4.0
+ROUTE_ILLUMINATION_SPACING_M: Final = 40.0
+TARGET_ORDER: Final = ("nearest", "largest", "deepest")
+CHOSEN_TARGET: Final = "nearest"
 SPEED_SWEEP: Final[NDArray[np.float64]] = np.linspace(0.10, 0.66, 29)
 BATTERY_SWEEP_WH: Final[NDArray[np.float64]] = np.linspace(50.0, 3000.0, 60)
 
@@ -193,9 +242,118 @@ def illuminate(
     )
     return illumination_fraction(
         horizon=horizon,
-        latitude_deg=float(np.mean(latitudes(raster, rows, columns))),
+        latitude_deg=latitudes(raster, rows, columns),
         north_azimuth_deg=north_azimuth_deg(raster, rows, columns),
     )
+
+
+@dataclass(frozen=True, slots=True)
+class Target:
+    """One candidate destination, and why it was chosen.
+
+    Which permanent shadow to visit is a genuine mission-design question rather
+    than a modelling detail: the nearest is cheapest, the largest gives the most
+    ground to work over, and the deepest is a different kind of expedition.
+    """
+
+    id: str
+    row: int
+    column: int
+    distance_km: float
+    drop_m: float
+    region_area_km2: float
+
+
+@dataclass(frozen=True, slots=True)
+class TargetStyle:
+    color: str
+    dash: Any
+    offset: tuple[float, float]
+    align: str
+
+
+TARGET_STYLE: Final[dict[str, TargetStyle]] = {
+    "nearest": TargetStyle(ACCENT_SECONDARY, "solid", (-12.0, 10.0), "right"),
+    "largest": TargetStyle(ACCENT_PRIMARY, (0, (5, 2)), (-14.0, 8.0), "right"),
+    "deepest": TargetStyle(INK_MUTED, (0, (1.6, 1.6)), (14.0, 10.0), "left"),
+}
+
+
+def find_targets(
+    setting_raster: GeoRaster,
+    *,
+    crest: tuple[int, int],
+    grid_rows: NDArray[np.int_],
+    grid_columns: NDArray[np.int_],
+    lit: NDArray[np.float64],
+) -> dict[str, Target]:
+    """Nearest, largest and deepest permanent shadow, from the illumination map.
+
+    Regions are four-connected components of the fully dark cells. The largest
+    one is entered at its nearest member rather than its centroid, because a
+    platform walks to the edge of a shadow and not to the middle of it.
+    """
+    dark = lit <= 0.0
+    if not bool(dark.any()):
+        raise ValueError(
+            "no fully shadowed cell on the illumination grid; there is nowhere "
+            "for this mission concept to go"
+        )
+    cell = setting_raster.cell_size_m
+    distance_m = np.hypot(
+        (grid_rows - crest[0]) * cell, (grid_columns - crest[1]) * cell
+    )
+    elevation = setting_raster.values[grid_rows, grid_columns]
+    drop = setting_raster.values[crest[0], crest[1]] - elevation
+
+    label = np.full(dark.shape, -1, dtype=int)
+    count = 0
+    for i in range(dark.shape[0]):
+        for j in range(dark.shape[1]):
+            if dark[i, j] and label[i, j] < 0:
+                stack = [(i, j)]
+                label[i, j] = count
+                while stack:
+                    a, b = stack.pop()
+                    for da, db in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                        p, q = a + da, b + db
+                        if (
+                            0 <= p < dark.shape[0]
+                            and 0 <= q < dark.shape[1]
+                            and dark[p, q]
+                            and label[p, q] < 0
+                        ):
+                            label[p, q] = count
+                            stack.append((p, q))
+                count += 1
+    sizes = np.array([int((label == k).sum()) for k in range(count)])
+    cell_area_km2 = (grid_rows[1, 0] - grid_rows[0, 0]) ** 2 * cell**2 / 1e6
+
+    def make(identifier: str, index: tuple[int, int]) -> Target:
+        region = int(label[index])
+        return Target(
+            id=identifier,
+            row=int(grid_rows[index]),
+            column=int(grid_columns[index]),
+            distance_km=float(distance_m[index]) / 1000.0,
+            drop_m=float(drop[index]),
+            region_area_km2=float(sizes[region]) * cell_area_km2,
+        )
+
+    nearest = np.unravel_index(
+        int(np.argmin(np.where(dark, distance_m, np.inf))), dark.shape
+    )
+    deepest = np.unravel_index(
+        int(np.argmax(np.where(dark, drop, -np.inf))), dark.shape
+    )
+    biggest = int(np.argmax(sizes))
+    members = np.argwhere(label == biggest)
+    entry = members[int(np.argmin([distance_m[a, b] for a, b in members]))]
+    return {
+        "nearest": make("nearest", (int(nearest[0]), int(nearest[1]))),
+        "largest": make("largest", (int(entry[0]), int(entry[1]))),
+        "deepest": make("deepest", (int(deepest[0]), int(deepest[1]))),
+    }
 
 
 @dataclass(frozen=True, slots=True)
@@ -213,7 +371,7 @@ class Setting:
     mobilization: Any
 
 
-def load_setting() -> Setting:
+def load_setting(destination: tuple[int, int] | None = None) -> Setting:
     raster = read_float_geotiff(ELEVATION_PATH)
     platform = load_platform(PLATFORM_PATH).platform
     dataset = load_soil(SOIL_PATH).datasets["carrier1991"]
@@ -222,7 +380,14 @@ def load_setting() -> Setting:
     mobilization = janosi_hanamoto_model(dataset)
 
     highest = np.unravel_index(int(np.argmax(raster.values)), raster.values.shape)
-    lowest = np.unravel_index(int(np.argmin(raster.values)), raster.values.shape)
+    # The crest is the charge point. The destination is chosen for being dark
+    # and close, not for being low: routing to the lowest cell in the window
+    # builds an expedition rather than a sortie.
+    lowest = (
+        destination
+        if destination is not None
+        else np.unravel_index(int(np.argmin(raster.values)), raster.values.shape)
+    )
     transect = sample_transect(
         raster,
         start_row_column=(int(highest[0]), int(highest[1])),
@@ -246,12 +411,8 @@ def load_setting() -> Setting:
         feet_in_stance=FEET_IN_STANCE,
         level_ground_slip_ratio=flat_slip,
     )
-    rows = np.rint(
-        np.linspace(highest[0], lowest[0], ROUTE_SAMPLES)
-    ).astype(int)
-    columns = np.rint(
-        np.linspace(highest[1], lowest[1], ROUTE_SAMPLES)
-    ).astype(int)
+    rows = np.rint(np.linspace(highest[0], lowest[0], ROUTE_SAMPLES)).astype(int)
+    columns = np.rint(np.linspace(highest[1], lowest[1], ROUTE_SAMPLES)).astype(int)
     return Setting(
         raster=raster,
         platform=platform,
@@ -274,9 +435,13 @@ def average_charge_W(lit_fraction: float) -> float:
 @dataclass(frozen=True, slots=True)
 class SpeedPoint:
     speed_m_per_s: float
-    hours: float
+    walking_hours: float
     locomotion_Wh: float
     survival_Wh: float
+
+    @property
+    def hours(self) -> float:
+        return self.walking_hours + DWELL_HOURS
 
     @property
     def total_Wh(self) -> float:
@@ -286,7 +451,16 @@ class SpeedPoint:
         return HOURS_PER_WEEK / (self.hours + self.total_Wh / charge_W)
 
 
-def sweep_speed(setting: Setting, *, survival_W: float) -> tuple[SpeedPoint, ...]:
+def sweep_speed(
+    setting: Setting, *, survival_W: float, dark_route_fraction: float
+) -> tuple[SpeedPoint, ...]:
+    """Energy against speed, with survival charged for the hours actually cold.
+
+    Those are the dwell hours plus whatever share of the traverse is shadowed.
+    Charging survival over the whole sortie -- which the first version of this
+    study did -- overstates it by the ratio of sortie to dwell, and on a short
+    route through lit ground that is an order of magnitude.
+    """
     points = []
     for speed in SPEED_SWEEP:
         moving = Platform(
@@ -316,22 +490,93 @@ def sweep_speed(setting: Setting, *, survival_W: float) -> tuple[SpeedPoint, ...
             level_ground_slip_ratio=flat_slip,
         )
         distance = trip.outbound.distance_m + trip.inbound.distance_m
-        hours = distance / float(speed) / 3600.0
+        walking_hours = distance / float(speed) / 3600.0
+        cold_hours = DWELL_HOURS + dark_route_fraction * walking_hours
         points.append(
             SpeedPoint(
                 speed_m_per_s=float(speed),
-                hours=hours,
+                walking_hours=walking_hours,
                 locomotion_Wh=trip.total_J
                 / JOULES_PER_WATT_HOUR
                 * NOMINAL_DERATING,
-                survival_Wh=survival_W * hours,
+                survival_Wh=survival_W * cold_hours,
             )
         )
     return tuple(points)
 
 
-def build_map_figure(setting: Setting, grid: Illumination, shape: tuple[int, int]) -> Figure:
-    raster = setting.raster
+@dataclass(frozen=True, slots=True)
+class Route:
+    """One target, the walk to it, and what that walk costs across speed."""
+
+    target: Target
+    setting: Setting
+    sampled_index: NDArray[np.int_]
+    illumination: Illumination
+    speed: tuple[SpeedPoint, ...]
+
+    @property
+    def dark_fraction(self) -> float:
+        return float((self.illumination.any_sunlight_fraction <= 0.0).mean())
+
+    @property
+    def walking_hours(self) -> float:
+        walked = (
+            self.setting.trip.outbound.distance_m + self.setting.trip.inbound.distance_m
+        )
+        return walked / self.setting.platform.nominal_speed_m_per_s / 3600.0
+
+    @property
+    def sortie_hours(self) -> float:
+        return self.walking_hours + DWELL_HOURS
+
+    @property
+    def locomotion_Wh(self) -> float:
+        return self.setting.trip.total_J / JOULES_PER_WATT_HOUR * NOMINAL_DERATING
+
+    @property
+    def survival_Wh(self) -> float:
+        cold = DWELL_HOURS + self.dark_fraction * self.walking_hours
+        return INSULATED_SURVIVAL_W * cold
+
+    @property
+    def total_Wh(self) -> float:
+        return self.locomotion_Wh + self.survival_Wh
+
+
+def walk_to(target: Target) -> Route:
+    setting = load_setting(destination=(target.row, target.column))
+    spacing = float(setting.transect.distance_m[-1]) / (setting.route_rows.size - 1)
+    stride = max(1, int(round(ROUTE_ILLUMINATION_SPACING_M / spacing)))
+    index = np.unique(
+        np.concatenate(
+            [
+                np.arange(0, setting.route_rows.size, stride),
+                [setting.route_rows.size - 1],
+            ]
+        )
+    )
+    illumination = illuminate(
+        setting.raster, setting.route_rows[index], setting.route_columns[index]
+    )
+    dark = float((illumination.any_sunlight_fraction <= 0.0).mean())
+    return Route(
+        target=target,
+        setting=setting,
+        sampled_index=index,
+        illumination=illumination,
+        speed=sweep_speed(
+            setting,
+            survival_W=INSULATED_SURVIVAL_W,
+            dark_route_fraction=dark,
+        ),
+    )
+
+
+def build_map_figure(
+    routes: dict[str, Route], grid: Illumination, shape: tuple[int, int]
+) -> Figure:
+    raster = routes[CHOSEN_TARGET].setting.raster
     lit = grid.any_sunlight_fraction.reshape(shape)
     extent = [
         raster.extent_m[0] / 1000.0,
@@ -351,15 +596,15 @@ def build_map_figure(setting: Setting, grid: Illumination, shape: tuple[int, int
             Any,
             figure_style(
                 {
-                    "figure.figsize": (7.6, 8.6),
+                    "figure.figsize": (7.6, 8.8),
                     "axes.titlesize": 9.5,
                     "xtick.labelsize": 8.5,
                     "ytick.labelsize": 8.5,
                     "font.size": 9.5,
                     "legend.fontsize": 8.0,
                     "axes.grid": False,
-                    "figure.subplot.top": 0.762,
-                    "figure.subplot.bottom": 0.062,
+                    "figure.subplot.top": 0.744,
+                    "figure.subplot.bottom": 0.060,
                     "figure.subplot.left": 0.108,
                     "figure.subplot.right": 0.880,
                 }
@@ -381,17 +626,61 @@ def build_map_figure(setting: Setting, grid: Illumination, shape: tuple[int, int
         bar = figure.colorbar(image, ax=panel, fraction=0.046, pad=0.03)
         bar.set_label("fraction of a year with any sunlight (%)")
 
-        route_x = [to_km(int(r), int(c))[0] for r, c in zip(setting.route_rows, setting.route_columns)]
-        route_y = [to_km(int(r), int(c))[1] for r, c in zip(setting.route_rows, setting.route_columns)]
-        panel.plot(route_x, route_y, color="white", linewidth=2.4, alpha=0.9)
-        panel.plot(route_x, route_y, color=ACCENT_SECONDARY, linewidth=1.3)
+        for name in TARGET_ORDER:
+            route = routes[name]
+            style = TARGET_STYLE[name]
+            setting = route.setting
+            xs = [
+                to_km(int(r), int(c))[0]
+                for r, c in zip(setting.route_rows, setting.route_columns)
+            ]
+            ys = [
+                to_km(int(r), int(c))[1]
+                for r, c in zip(setting.route_rows, setting.route_columns)
+            ]
+            panel.plot(xs, ys, color="white", linewidth=3.0, alpha=0.85)
+            panel.plot(
+                xs,
+                ys,
+                color=style.color,
+                linewidth=1.6 if name == CHOSEN_TARGET else 1.2,
+                linestyle=style.dash,
+                label=(
+                    f"{name}, {route.target.distance_km:.1f} km, "
+                    f"{route.total_Wh:.0f} Wh"
+                    + (" — the mission" if name == CHOSEN_TARGET else "")
+                ),
+            )
+            end_x, end_y = to_km(route.target.row, route.target.column)
+            panel.plot(
+                [end_x],
+                [end_y],
+                marker="s",
+                markersize=7.0,
+                markerfacecolor="none",
+                markeredgewidth=1.6,
+                color="white",
+            )
+            panel.annotate(
+                name,
+                xy=(end_x, end_y),
+                xytext=style.offset,
+                textcoords="offset points",
+                ha=style.align,
+                color="white",
+                fontsize=8.0,
+            )
 
-        crest_x, crest_y = to_km(*setting.crest)
-        end_x, end_y = to_km(*setting.destination)
-        panel.plot([crest_x], [crest_y], marker="o", markersize=8.0,
-                   markerfacecolor="none", markeredgewidth=1.8, color="white")
-        panel.plot([end_x], [end_y], marker="s", markersize=8.0,
-                   markerfacecolor="none", markeredgewidth=1.8, color="white")
+        crest_x, crest_y = to_km(*routes[CHOSEN_TARGET].setting.crest)
+        panel.plot(
+            [crest_x],
+            [crest_y],
+            marker="o",
+            markersize=8.0,
+            markerfacecolor="none",
+            markeredgewidth=1.8,
+            color="white",
+        )
         panel.annotate(
             "charge point\non the crest",
             xy=(crest_x, crest_y),
@@ -401,32 +690,25 @@ def build_map_figure(setting: Setting, grid: Illumination, shape: tuple[int, int
             color="white",
             fontsize=8.0,
         )
-        panel.annotate(
-            "destination\n100% dark",
-            xy=(end_x, end_y),
-            xytext=(16, -26),
-            textcoords="offset points",
-            ha="left",
-            va="top",
-            color="white",
-            fontsize=8.0,
-        )
+        legend = panel.legend(loc="lower left", labelcolor="white", framealpha=0.0)
+        for text in legend.get_texts():
+            text.set_color("white")
         panel.set_xlabel("polar stereographic x (km)")
         panel.set_ylabel("polar stereographic y (km)")
         panel.set_aspect("equal")
 
         figure.suptitle(
-            "From a crest lit four fifths of the year into ground that never "
-            "sees the Sun",
+            "Three permanent shadows reachable from one lit crest, and they are "
+            "not equivalent",
             color=INK_PRIMARY,
             fontsize=11.0,
             x=0.108,
             ha="left",
-            y=0.972,
+            y=0.976,
         )
         figure.text(
             0.108,
-            0.930,
+            0.936,
             caption(
                 "Horizon computed from the 5 m LOLA grid at every point shown, "
                 "swept over a year of lunations with the Sun treated as a disc "
@@ -434,6 +716,13 @@ def build_map_figure(setting: Setting, grid: Illumination, shape: tuple[int, int
                 f"oscillating within the Moon's {LUNAR_OBLIQUITY_DEG:.2f}° "
                 "obliquity. Lunar curvature is included: it drops distant ground "
                 "by 29 m at 10 km.\n"
+                "Targets are the nearest, the largest and the deepest fully dark "
+                "ground on this map. Which one a mission goes to is a real choice "
+                "and the machinery now prices it; the nearest is walked here "
+                "because the concept is a day trip from a charge point. Energies "
+                "in the legend are round trips at the platform's nominal "
+                f"{routes[CHOSEN_TARGET].setting.platform.nominal_speed_m_per_s:.2f} m/s; "
+                "what speed costs is the third figure.\n"
                 f"Rays leaving the {raster.shape[0] * raster.cell_size_m / 1000:.0f} km "
                 "window count as clear sky, so distant massifs are missing and "
                 "every bright value is an upper bound. That caveat is one-sided: "
@@ -450,32 +739,20 @@ def build_map_figure(setting: Setting, grid: Illumination, shape: tuple[int, int
     return figure
 
 
-def build_route_figure(setting: Setting, route: Illumination) -> Figure:
-    stride = ROUTE_ILLUMINATION_STRIDE
-    index = np.unique(
-        np.concatenate(
-            [np.arange(0, setting.transect.distance_m.size, stride),
-             [setting.transect.distance_m.size - 1]]
-        )
-    )
-    distance_km = setting.transect.distance_m[index] / 1000.0
-    any_sun = route.any_sunlight_fraction
-    dark = any_sun <= 0.0
-    first_dark = int(np.argmax(dark)) if bool(dark.any()) else len(dark)
-
+def build_route_figure(routes: dict[str, Route]) -> Figure:
     with plt.rc_context(
         cast(
             Any,
             figure_style(
                 {
-                    "figure.figsize": (10.2, 5.6),
+                    "figure.figsize": (10.2, 5.8),
                     "axes.titlesize": 9.5,
                     "xtick.labelsize": 8.5,
                     "ytick.labelsize": 8.5,
                     "font.size": 9.5,
                     "legend.fontsize": 8.0,
-                    "figure.subplot.top": 0.680,
-                    "figure.subplot.bottom": 0.155,
+                    "figure.subplot.top": 0.660,
+                    "figure.subplot.bottom": 0.150,
                     "figure.subplot.left": 0.080,
                     "figure.subplot.right": 0.905,
                     "figure.subplot.hspace": 0.380,
@@ -484,91 +761,102 @@ def build_route_figure(setting: Setting, route: Illumination) -> Figure:
         )
     ):
         figure, axes = plt.subplots(2, 1, squeeze=False, sharex=True)
+        upper, lower = axes[0][0], axes[1][0]
 
-        upper = axes[0][0]
-        upper.plot(
-            distance_km, any_sun * 100.0, color=ACCENT_PRIMARY, linewidth=1.7
-        )
-        upper.fill_between(
-            distance_km, 0.0, any_sun * 100.0, color=ACCENT_PRIMARY, alpha=0.16,
-            linewidth=0.0,
-        )
-        if first_dark < len(dark):
-            upper.axvline(
-                distance_km[first_dark], color=INK_PRIMARY, linewidth=1.1,
-                linestyle=(0, (3, 2)),
+        for name in TARGET_ORDER:
+            route = routes[name]
+            style = TARGET_STYLE[name]
+            transect = route.setting.transect
+            distance_km = transect.distance_m[route.sampled_index] / 1000.0
+            any_sun = route.illumination.any_sunlight_fraction
+            dark = any_sun <= 0.0
+            width = 1.9 if name == CHOSEN_TARGET else 1.3
+
+            upper.plot(
+                distance_km,
+                any_sun * 100.0,
+                color=style.color,
+                linewidth=width,
+                linestyle=style.dash,
+                label=f"{name}, {route.dark_fraction:.0%} of the walk in shadow",
             )
-            upper.annotate(
-                f"enters permanent shadow at {distance_km[first_dark]:.1f} km",
-                xy=(distance_km[first_dark], 60.0),
-                xytext=(8, 0),
-                textcoords="offset points",
-                color=INK_PRIMARY,
-                fontsize=8.0,
+            elevation = transect.elevation_m[route.sampled_index]
+            lower.plot(
+                distance_km,
+                elevation,
+                color=style.color,
+                linewidth=width,
+                linestyle=style.dash,
             )
+            lower.plot(
+                np.where(dark, distance_km, np.nan),
+                np.where(dark, elevation, np.nan),
+                color=style.color,
+                linewidth=width + 3.4,
+                alpha=0.30,
+                solid_capstyle="round",
+            )
+            if bool(dark.any()):
+                entry = int(np.argmax(dark))
+                upper.plot(
+                    [distance_km[entry]],
+                    [any_sun[entry] * 100.0],
+                    marker="v",
+                    markersize=5.5,
+                    color=style.color,
+                )
+
         upper.set_ylabel("any sunlight (% of year)")
         upper.set_title(
-            "illumination along the route", color=INK_SECONDARY, loc="left"
+            "illumination along each route", color=INK_SECONDARY, loc="left"
         )
-        upper.set_ylim(0.0, 102.0)
+        upper.set_ylim(-4.0, 102.0)
+        upper.legend(loc="upper right")
 
-        lower = axes[1][0]
-        lower.plot(
-            distance_km,
-            setting.transect.elevation_m[index],
-            color=INK_PRIMARY,
-            linewidth=1.6,
-        )
-        lower.fill_between(
-            distance_km,
-            float(setting.transect.elevation_m.min()),
-            setting.transect.elevation_m[index],
-            where=dark,
-            color=INK_PRIMARY,
-            alpha=0.20,
-            linewidth=0.0,
-            label="in permanent shadow",
-        )
-        lower.set_xlabel("distance along the route (km)")
+        lower.set_xlabel("distance from the charge point (km)")
         lower.set_ylabel("elevation (m)")
         lower.set_title(
-            "and the profile it follows", color=INK_SECONDARY, loc="left"
+            "and the profile each one follows", color=INK_SECONDARY, loc="left"
         )
-        lower.legend(loc="upper right")
 
         for panel in (upper, lower):
             panel.spines["top"].set_visible(False)
             panel.spines["right"].set_visible(False)
 
-        shadow_fraction = float(dark.mean())
-        one_way_hours = (
-            setting.trip.outbound.distance_m / setting.platform.nominal_speed_m_per_s / 3600.0
-        )
+        chosen = routes[CHOSEN_TARGET]
         figure.suptitle(
-            "The sortie is a lit traverse to a dark point, not a traverse "
-            "through darkness",
+            "Every route is a lit traverse into a dark end, and the short one "
+            "spends the largest share of itself cold",
             color=INK_PRIMARY,
             fontsize=11.5,
             x=0.080,
             ha="left",
-            y=0.958,
+            y=0.962,
         )
         figure.text(
             0.080,
-            0.900,
+            0.908,
             caption(
-                f"Only {shadow_fraction:.0%} of the route is permanently shadowed — "
-                "the destination itself. Everything before it sees the Sun for "
-                "part of a year, which is a statement about the year and not "
-                "about the sortie.\n"
-                "So how long the platform is actually cold depends on WHEN the "
-                "sortie runs, not only where it goes: a "
-                f"{one_way_hours * 2:.0f} hour round trip is a fifteenth of a "
-                "lunation, and a sortie timed into the lit part of the cycle "
-                "spends little of it in shadow while a badly timed one spends "
-                "all of it. Day 8's survival power applies to the dark hours, "
-                "and scheduling decides how many there are. This study does not "
-                "schedule.",
+                "Shading marks the shadowed stretches. Each route ends in "
+                "permanent shadow and is otherwise lit, apart from short "
+                "crossings: the mission route dips into one at 1.6 km before "
+                "reaching its destination at 2.6. So survival power is mostly a "
+                "cost of arriving rather than of travelling, and the share is not "
+                "the same across the three, because a shadowed approach is a "
+                f"fixed length while the walk is not — {chosen.dark_fraction:.0%} "
+                f"of the {chosen.target.distance_km:.1f} km route against "
+                f"{routes['deepest'].dark_fraction:.0%} of the "
+                f"{routes['deepest'].target.distance_km:.1f} km one. Illumination "
+                f"is sampled every {ROUTE_ILLUMINATION_SPACING_M:.0f} m on all "
+                "three so those shares are comparable; crossings shorter than "
+                "that are still missed.\n"
+                "How long the platform is actually cold therefore depends on WHEN "
+                "the sortie runs as well as where it goes: a "
+                f"{chosen.sortie_hours:.0f} hour round trip is a hundredth of a "
+                "lunation, and one timed into the lit part of the cycle spends "
+                "little of it in shadow while a badly timed one spends all of it. "
+                "Day 8's survival power applies to the dark hours, and scheduling "
+                "decides how many there are. This study does not schedule.",
                 width=150,
             ),
             color=INK_SECONDARY,
@@ -580,22 +868,15 @@ def build_route_figure(setting: Setting, route: Illumination) -> Figure:
     return figure
 
 
-def build_throughput_figure(setting: Setting, crest_lit: float) -> Figure:
+def build_throughput_figure(routes: dict[str, Route], crest_lit: float) -> Figure:
     charge_W = average_charge_W(crest_lit)
-    insulated = sweep_speed(setting, survival_W=INSULATED_SURVIVAL_W)
-    energies = np.asarray([point.total_Wh for point in insulated])
-    locomotion = np.asarray([point.locomotion_Wh for point in insulated])
-    survival = np.asarray([point.survival_Wh for point in insulated])
-    throughput = np.asarray(
-        [point.sorties_per_week(charge_W) for point in insulated]
-    )
-    speeds = np.asarray([point.speed_m_per_s for point in insulated])
-
-    cheapest = int(np.argmin(energies))
-    fastest = int(np.argmax(throughput))
+    chosen = routes[CHOSEN_TARGET]
+    speeds = np.asarray([point.speed_m_per_s for point in chosen.speed])
+    locomotion = np.asarray([point.locomotion_Wh for point in chosen.speed])
+    survival = np.asarray([point.survival_Wh for point in chosen.speed])
     cap = maximum_walking_speed(
-        platform=setting.platform,
-        strength=setting.strength,
+        platform=chosen.setting.platform,
+        strength=chosen.setting.strength,
         gravity_m_per_s2=LUNAR_GRAVITY,
     )
 
@@ -604,126 +885,164 @@ def build_throughput_figure(setting: Setting, crest_lit: float) -> Figure:
             Any,
             figure_style(
                 {
-                    "figure.figsize": (10.4, 5.4),
+                    "figure.figsize": (12.2, 6.1),
                     "axes.titlesize": 9.5,
                     "xtick.labelsize": 8.5,
                     "ytick.labelsize": 8.5,
                     "font.size": 9.5,
                     "legend.fontsize": 8.0,
-                    "figure.subplot.top": 0.650,
-                    "figure.subplot.bottom": 0.190,
-                    "figure.subplot.left": 0.070,
-                    "figure.subplot.right": 0.986,
-                    "figure.subplot.wspace": 0.240,
+                    "figure.subplot.top": 0.610,
+                    "figure.subplot.bottom": 0.168,
+                    "figure.subplot.left": 0.060,
+                    "figure.subplot.right": 0.985,
+                    "figure.subplot.wspace": 0.250,
                 }
             ),
         )
     ):
-        figure, axes = plt.subplots(1, 2, squeeze=False)
+        figure, axes = plt.subplots(1, 3, squeeze=False)
+        left, middle, right = axes[0][0], axes[0][1], axes[0][2]
 
-        left = axes[0][0]
         left.stackplot(
             speeds,
             locomotion,
             survival,
             colors=[ACCENT_PRIMARY, ACCENT_SECONDARY],
-            labels=["locomotion, rises as speed squared", "survival, falls as one over speed"],
+            labels=[
+                "locomotion, rises as speed squared",
+                "survival, a dwell plus a shadowed approach",
+            ],
             edgecolor="none",
             alpha=0.9,
         )
-        left.plot(speeds, energies, color=INK_PRIMARY, linewidth=1.6)
         left.plot(
-            [speeds[cheapest]], [energies[cheapest]], marker="o", markersize=6.0,
-            markerfacecolor="none", color=INK_PRIMARY,
-        )
-        left.annotate(
-            f"least energy at {speeds[cheapest]:.2f} m/s\n{energies[cheapest]:.0f} Wh",
-            xy=(speeds[cheapest], energies[cheapest]),
-            xytext=(8, 24),
-            textcoords="offset points",
+            speeds,
+            np.asarray([point.total_Wh for point in chosen.speed]),
             color=INK_PRIMARY,
-            fontsize=8.0,
+            linewidth=1.6,
         )
         left.set_xlabel("walking speed (m/s)")
         left.set_ylabel("sortie energy (Wh)")
         left.set_title(
-            "the two dominant terms pull opposite ways",
+            f"what the {CHOSEN_TARGET} sortie is made of",
             color=INK_SECONDARY,
             loc="left",
         )
         left.set_xlim(speeds[0], speeds[-1])
-        left.set_ylim(0.0, float(energies.max()) * 1.05)
+        left.set_ylim(0.0, float(locomotion[-1] + survival[-1]) * 1.05)
         left.legend(loc="upper center")
 
-        right = axes[0][1]
-        right.plot(speeds, throughput, color=ACCENT_PRIMARY, linewidth=1.8)
-        right.plot(
-            [speeds[fastest]], [throughput[fastest]], marker="o", markersize=6.0,
-            markerfacecolor="none", color=INK_PRIMARY,
+        least_energy: dict[str, float] = {}
+        most_sorties: dict[str, float] = {}
+        for name in TARGET_ORDER:
+            route = routes[name]
+            style = TARGET_STYLE[name]
+            width = 1.9 if name == CHOSEN_TARGET else 1.3
+            energies = np.asarray([point.total_Wh for point in route.speed])
+            throughput = np.asarray(
+                [point.sorties_per_week(charge_W) for point in route.speed]
+            )
+            cheapest = int(np.argmin(energies))
+            fastest = int(np.argmax(throughput))
+            least_energy[name] = float(speeds[cheapest])
+            most_sorties[name] = float(speeds[fastest])
+
+            middle.plot(
+                speeds,
+                energies,
+                color=style.color,
+                linewidth=width,
+                linestyle=style.dash,
+                label=f"{name}, least {energies[cheapest]:.0f} Wh",
+            )
+            middle.plot(
+                [speeds[cheapest]],
+                [energies[cheapest]],
+                marker="o",
+                markersize=5.5,
+                markerfacecolor="none",
+                color=style.color,
+            )
+            right.plot(
+                speeds,
+                throughput,
+                color=style.color,
+                linewidth=width,
+                linestyle=style.dash,
+                label=f"{name}, peak {throughput[fastest]:.1f} per week",
+            )
+            right.plot(
+                [speeds[fastest]],
+                [throughput[fastest]],
+                marker="o",
+                markersize=5.5,
+                markerfacecolor="none",
+                color=style.color,
+            )
+
+        middle.set_xlabel("walking speed (m/s)")
+        middle.set_ylabel("sortie energy (Wh)")
+        middle.set_title(
+            "and only the shortest has a minimum at all",
+            color=INK_SECONDARY,
+            loc="left",
         )
-        right.annotate(
-            f"most sorties at {speeds[fastest]:.2f} m/s\n{throughput[fastest]:.1f} per week",
-            xy=(speeds[fastest], throughput[fastest]),
-            xytext=(-10, -34),
-            textcoords="offset points",
-            ha="right",
-            color=INK_PRIMARY,
-            fontsize=8.0,
-        )
-        right.axvline(
-            speeds[cheapest], color=ACCENT_SECONDARY, linewidth=1.0,
-            linestyle=(0, (3, 2)),
-        )
-        right.annotate(
-            "least-energy speed",
-            xy=(speeds[cheapest], throughput.max() * 0.30),
-            xytext=(6, 0),
-            textcoords="offset points",
-            rotation=90.0,
-            va="center",
-            color=ACCENT_SECONDARY,
-            fontsize=7.8,
-        )
-        if cap <= speeds[-1]:
-            right.axvline(cap, color=INK_PRIMARY, linewidth=1.0, linestyle=(0, (2, 2)))
+        middle.set_xlim(speeds[0], speeds[-1])
+        middle.set_yscale("log")
+        middle.legend(loc="upper left")
+
         right.set_xlabel("walking speed (m/s)")
         right.set_ylabel("sorties per week")
         right.set_title(
-            f"and throughput peaks somewhere else, at {charge_W:.0f} W of charge",
+            f"and throughput peaks elsewhere, on {charge_W:.0f} W",
             color=INK_SECONDARY,
             loc="left",
         )
         right.set_xlim(speeds[0], speeds[-1])
         right.set_ylim(0.0, None)
+        right.legend(loc="lower center")
 
-        for panel in (left, right):
+        for panel in (left, middle, right):
             panel.spines["top"].set_visible(False)
             panel.spines["right"].set_visible(False)
 
         figure.suptitle(
-            "There is no single best speed: energy is cheapest at "
-            f"{speeds[cheapest]:.2f} m/s and throughput peaks at {speeds[fastest]:.2f}",
+            "Energy and throughput want different speeds, and only the short "
+            "sortie has a cheapest one at all",
             color=INK_PRIMARY,
             fontsize=11.5,
-            x=0.070,
+            x=0.060,
             ha="left",
             y=0.955,
         )
         figure.text(
-            0.070,
-            0.892,
+            0.060,
+            0.912,
             caption(
                 "Swing work per metre goes as the square of speed, so locomotion "
-                "rises. Survival is a power times a duration, so it falls as one "
-                "over speed. Their sum has a minimum, and it is not where "
-                "throughput is greatest — a faster sortie is a shorter one even "
-                "when it costs more, until slip runs away near the gait limit "
-                "and throughput falls again.\n"
-                f"Charge does not bind. At {ARRAY_AREA_M2:.1f} m² and "
-                f"{ARRAY_EFFICIENCY:.0%}, recharging takes hours against a sortie "
-                "of days, so which speed to walk is a mission decision between "
-                "energy and throughput rather than a power-system question.",
-                width=150,
+                "rises. Survival is a power times a duration and most of that "
+                "duration is a fixed dwell, so it falls toward a floor rather than "
+                "as one over speed. Their sum has a minimum, but a shallow one, "
+                "and not where throughput is greatest — a faster sortie is a "
+                "shorter one even when it costs more, until slip runs away and "
+                f"throughput turns over below the {cap:.2f} m/s gait limit from "
+                "rung three.\n"
+                "Whether that minimum exists at all depends on the target. A "
+                "shadowed approach is roughly a fixed length, so it is "
+                f"{routes[CHOSEN_TARGET].dark_fraction:.0%} of the mission route "
+                f"and {routes['deepest'].dark_fraction:.1%} of the deepest; on the "
+                "two longer routes survival is too nearly constant to bend the "
+                "sum, and energy simply rises with speed. On the mission route "
+                "the two "
+                f"optima sit at {least_energy[CHOSEN_TARGET]:.2f} and "
+                f"{most_sorties[CHOSEN_TARGET]:.2f} m/s, and crossing between them "
+                "costs about twice the energy for about twice the sorties.\n"
+                f"Charge does not bind on any of the three. At {ARRAY_AREA_M2:.1f} m² "
+                f"and {ARRAY_EFFICIENCY:.0%} the crest returns {charge_W:.0f} W, so "
+                "recharging takes hours against a sortie measured in hours too. "
+                "Energy is on a log axis because the deepest target costs five "
+                "times the nearest.",
+                width=178,
             ),
             color=INK_SECONDARY,
             fontsize=8.2,
@@ -786,8 +1105,8 @@ def boundary_rows(setting: Setting, grid: Illumination, crest_lit: float) -> tup
             status=UNMEASURED,
             basis=(
                 "assumed, and it does not bind: recharge takes hours against a "
-                "sortie of days, so throughput is limited by walking rather than "
-                "by waiting"
+                "sortie that also takes hours, so throughput is limited by "
+                "walking rather than by waiting"
             ),
         ),
         BoundaryRow(
@@ -840,18 +1159,21 @@ def _format_float(value: float) -> str:
 
 
 def build_report(
-    setting: Setting, grid: Illumination, route: Illumination, probes: Illumination
+    routes: dict[str, Route],
+    grid: Illumination,
+    probes: Illumination,
 ) -> str:
+    chosen = routes[CHOSEN_TARGET]
     crest_lit = float(probes.any_sunlight_fraction[0])
     destination_lit = float(probes.any_sunlight_fraction[1])
     charge_W = average_charge_W(crest_lit)
-    rows = boundary_rows(setting, grid, crest_lit)
-    insulated = sweep_speed(setting, survival_W=INSULATED_SURVIVAL_W)
+    rows = boundary_rows(chosen.setting, grid, crest_lit)
+    insulated = chosen.speed
     energies = [point.total_Wh for point in insulated]
     throughput = [point.sorties_per_week(charge_W) for point in insulated]
     cheapest = int(np.argmin(energies))
     fastest = int(np.argmax(throughput))
-    dark_fraction = float((route.any_sunlight_fraction <= 0.0).mean())
+    dark_fraction = chosen.dark_fraction
 
     lines = [
         "# SPDX-License-Identifier: Apache-2.0",
@@ -899,17 +1221,62 @@ def build_report(
         "",
         "[route_illumination]",
         f"shadowed_fraction_of_route = {_format_float(dark_fraction)}",
+        f"dwell_hours = {_format_float(DWELL_HOURS)}",
+        'survival_applies_to = "dwell hours plus the shadowed share of the '
+        'traverse, not the whole sortie"',
+        "",
+        "# Which permanent shadow to visit, priced. The nearest is the mission;",
+        "# the deepest is an expedition and is included to show the difference.",
+        "# An earlier version of this study routed to the lowest cell in the",
+        "# window and built the second by accident.",
         "",
         "# The trade that has no single answer. Locomotion rises as the square of",
         "# speed because swing work does; survival falls as one over speed",
         "# because it is a power times a duration.",
         "",
     ]
+    for name in TARGET_ORDER:
+        route = routes[name]
+        target = route.target
+        energies_here = [point.total_Wh for point in route.speed]
+        throughput_here = [
+            point.sorties_per_week(charge_W) for point in route.speed
+        ]
+        least = int(np.argmin(energies_here))
+        most = int(np.argmax(throughput_here))
+        lines += [
+            "[[target]]",
+            f'id = "{target.id}"',
+            f"distance_km = {_format_float(target.distance_km)}",
+            f"drop_m = {_format_float(target.drop_m)}",
+            f"shadow_area_km2 = {_format_float(target.region_area_km2)}",
+            "shadowed_fraction_of_route = "
+            f"{_format_float(route.dark_fraction)}",
+            f"walking_hours = {_format_float(route.walking_hours)}",
+            f"sortie_hours = {_format_float(route.sortie_hours)}",
+            f"locomotion_Wh = {_format_float(route.locomotion_Wh)}",
+            f"survival_Wh = {_format_float(route.survival_Wh)}",
+            f"total_Wh = {_format_float(route.total_Wh)}",
+            "least_energy_speed_m_per_s = "
+            f"{_format_float(route.speed[least].speed_m_per_s)}",
+            f"least_energy_Wh = {_format_float(energies_here[least])}",
+            "most_sorties_speed_m_per_s = "
+            f"{_format_float(route.speed[most].speed_m_per_s)}",
+            f"most_sorties_per_week = {_format_float(throughput_here[most])}",
+            "chosen = " + str(name == CHOSEN_TARGET).lower(),
+            "",
+        ]
+
+    lines += [
+        "# Energy against speed, on the chosen route.",
+        "",
+    ]
     for point in insulated[::4]:
         lines += [
             "[[speed]]",
             f"speed_m_per_s = {_format_float(point.speed_m_per_s)}",
-            f"hours = {_format_float(point.hours)}",
+            f"walking_hours = {_format_float(point.walking_hours)}",
+            f"sortie_hours = {_format_float(point.hours)}",
             f"locomotion_Wh = {_format_float(point.locomotion_Wh)}",
             f"survival_Wh = {_format_float(point.survival_Wh)}",
             f"total_Wh = {_format_float(point.total_Wh)}",
@@ -929,8 +1296,8 @@ def build_report(
         "gait_speed_cap_m_per_s = "
         + _format_float(
             maximum_walking_speed(
-                platform=setting.platform,
-                strength=setting.strength,
+                platform=chosen.setting.platform,
+                strength=chosen.setting.strength,
                 gravity_m_per_s2=LUNAR_GRAVITY,
             )
         ),
@@ -939,18 +1306,33 @@ def build_report(
         "[binding]",
         "statement = \"\"\"",
         "Charge does not bind. A modest array at the crest recharges a sortie's",
-        "battery in hours against a sortie that takes days, so throughput is set",
-        "by how long the walk takes rather than how long the waiting takes.",
+        "battery in hours against a sortie that also takes hours, so throughput",
+        "is set by how long the walk takes rather than how long the waiting",
+        "takes.",
         "",
-        "What binds is duration, and duration is a choice. Sortie energy is least",
-        "at about a third of a metre per second, where rising swing work meets",
-        "falling survival energy. Throughput is greatest at roughly twice that,",
-        "because a shorter sortie repeats sooner even when it costs more -- until",
-        "slip runs away near the gait limit from rung three and throughput falls",
-        "again.",
+        "What binds is duration, and duration is a choice. Survival is charged",
+        "for the hours actually spent cold: the dwell, plus the shadowed final",
+        "approach, which on this route is about an eighth of the walk. So it is",
+        "mostly a fixed cost with a small speed-dependent part, and the energy",
+        "minimum it produces is shallow and sits near a sixth of a metre per",
+        "second. Throughput rises with speed until slip runs away near the gait",
+        "limit from rung three, and then falls.",
         "",
-        "So there is no single best speed, and which one to walk is a mission",
-        "decision between energy and throughput rather than a physical limit.",
+        "That minimum is a property of the route rather than of the platform.",
+        "A shadowed approach is roughly a fixed length, so it is an eighth of the",
+        "nearest route and under two percent of the deepest, and on the two",
+        "longer routes survival is too nearly constant in speed to bend the sum",
+        "at all. Their least-energy speed is simply the slowest speed swept, and",
+        "the per-target blocks above report it as such rather than as an",
+        "optimum.",
+        "",
+        "An earlier version of this study put that minimum at twice the speed",
+        "and made much more of it. That was an artifact of the route: charging",
+        "survival power over a fifty-six hour traverse that should never have",
+        "been the mission made the falling term far larger than it is. The trade",
+        "is real but it is shallow, and between the least-energy and",
+        "most-throughput speeds the energy penalty is about a factor of two for",
+        "roughly a doubling of sorties.",
         '"""',
         "",
         f"# {tally(rows)}",
@@ -978,9 +1360,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
-    setting = load_setting()
-    height, width = setting.raster.shape
-
+    # Pass one: the illumination map, which is what target selection needs.
+    scout = load_setting()
+    height, width = scout.raster.shape
     grid_rows, grid_columns = np.meshgrid(
         np.arange(0, height, MAP_STRIDE),
         np.arange(0, width, MAP_STRIDE),
@@ -988,25 +1370,32 @@ def main(argv: list[str] | None = None) -> int:
     )
     shape = grid_rows.shape
     print(f"  horizon over {grid_rows.size} map points ...")
-    grid = illuminate(setting.raster, grid_rows.ravel(), grid_columns.ravel())
+    grid = illuminate(scout.raster, grid_rows.ravel(), grid_columns.ravel())
+    lit_map = grid.any_sunlight_fraction.reshape(shape)
 
-    stride = ROUTE_ILLUMINATION_STRIDE
-    # Include the final sample explicitly: a stride that misses the endpoint
-    # would report a route that never reaches the place it is going.
-    route_index = np.unique(
-        np.concatenate(
-            [np.arange(0, setting.route_rows.size, stride), [setting.route_rows.size - 1]]
+    targets = find_targets(
+        scout.raster,
+        crest=scout.crest,
+        grid_rows=grid_rows,
+        grid_columns=grid_columns,
+        lit=lit_map,
+    )
+    for target in targets.values():
+        print(
+            f"  {target.id:8s} PSR: {target.distance_km:5.2f} km, "
+            f"{target.drop_m:6.0f} m below the crest, "
+            f"{target.region_area_km2:.2f} km2 of shadow"
         )
-    )
-    print(f"  horizon along {route_index.size} route points ...")
-    route = illuminate(
-        setting.raster, setting.route_rows[route_index], setting.route_columns[route_index]
-    )
+
+    # Pass two: walk to every candidate, because which shadow to visit is a
+    # real choice and pricing one of them cannot answer it.
+    routes = {name: walk_to(target) for name, target in targets.items()}
+    chosen = routes[CHOSEN_TARGET]
 
     probes = illuminate(
-        setting.raster,
-        np.array([setting.crest[0], setting.destination[0]]),
-        np.array([setting.crest[1], setting.destination[1]]),
+        chosen.setting.raster,
+        np.array([chosen.setting.crest[0], chosen.target.row]),
+        np.array([chosen.setting.crest[1], chosen.target.column]),
     )
     crest_lit = float(probes.any_sunlight_fraction[0])
 
@@ -1014,9 +1403,9 @@ def main(argv: list[str] | None = None) -> int:
     arguments.report.parent.mkdir(parents=True, exist_ok=True)
 
     for name, figure in (
-        ("illumination-map", build_map_figure(setting, grid, shape)),
-        ("illumination-along-the-route", build_route_figure(setting, route)),
-        ("speed-energy-throughput", build_throughput_figure(setting, crest_lit)),
+        ("illumination-map", build_map_figure(routes, grid, shape)),
+        ("illumination-along-the-route", build_route_figure(routes)),
+        ("speed-energy-throughput", build_throughput_figure(routes, crest_lit)),
     ):
         path = arguments.figure_directory / f"{name}.png"
         figure.savefig(path, dpi=200)
@@ -1024,12 +1413,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"wrote {path.relative_to(REPOSITORY_ROOT)}")
 
     arguments.report.write_text(
-        build_report(setting, grid, route, probes), encoding="utf-8"
+        build_report(routes, grid, probes), encoding="utf-8"
     )
     print(f"wrote {arguments.report.relative_to(REPOSITORY_ROOT)}")
 
     print("\n  measured against extrapolated\n")
-    print(text_table(boundary_rows(setting, grid, crest_lit)))
+    print(text_table(boundary_rows(chosen.setting, grid, crest_lit)))
     return 0
 
 

@@ -27,110 +27,193 @@ truncation_direction = "lit fractions are upper bounds; dark ground stays dark"
 [destination]
 lit_fraction = 0.0
 is_permanently_shadowed = true
-horizon_max_deg = 11.882183382617223
+horizon_max_deg = 17.570744869708708
 note = "de Gerlache's own interior lies outside this window; the route still ends in permanent shadow"
 
 [charge_point]
-lit_fraction = 0.8765432098765431
+lit_fraction = 0.9080246913580248
 horizon_max_deg = -0.6635292745259228
 array_area_m2 = 0.5
 array_efficiency = 0.3
-average_charge_W = 178.94629629629628
+average_charge_W = 185.37324074074075
 
 [route_illumination]
-shadowed_fraction_of_route = 0.009900990099009901
+shadowed_fraction_of_route = 0.11764705882352941
+dwell_hours = 4.0
+survival_applies_to = "dwell hours plus the shadowed share of the traverse, not the whole sortie"
+
+# Which permanent shadow to visit, priced. The nearest is the mission;
+# the deepest is an expedition and is included to show the difference.
+# An earlier version of this study routed to the lowest cell in the
+# window and built the second by accident.
 
 # The trade that has no single answer. Locomotion rises as the square of
 # speed because swing work does; survival falls as one over speed
 # because it is a power times a duration.
 
+[[target]]
+id = "nearest"
+distance_km = 2.8023561515267823
+drop_m = 273.0670166015625
+shadow_area_km2 = 0.0625
+shadowed_fraction_of_route = 0.11764705882352941
+walking_hours = 3.166845590965379
+sortie_hours = 7.166845590965379
+locomotion_Wh = 123.93018768473004
+survival_Wh = 51.596326820399
+total_Wh = 175.52651450512906
+least_energy_speed_m_per_s = 0.16
+least_energy_Wh = 111.17849282954106
+most_sorties_speed_m_per_s = 0.6
+most_sorties_per_week = 21.210184922885485
+chosen = true
+
+[[target]]
+id = "largest"
+distance_km = 3.86855270094644
+drop_m = 901.5922241210938
+shadow_area_km2 = 0.8125
+shadowed_fraction_of_route = 0.019801980198019802
+walking_hours = 4.45142345712755
+sortie_hours = 8.45142345712755
+locomotion_Wh = 185.8591772159412
+survival_Wh = 48.240134589982276
+total_Wh = 234.0993118059235
+least_energy_speed_m_per_s = 0.1
+least_energy_Wh = 148.0891945408938
+most_sorties_speed_m_per_s = 0.6
+most_sorties_per_week = 17.897344923135762
+chosen = false
+
+[[target]]
+id = "deepest"
+distance_km = 19.798881281526995
+drop_m = 3078.4249267578125
+shadow_area_km2 = 0.1875
+shadowed_fraction_of_route = 0.0125
+walking_hours = 22.36186338442336
+sortie_hours = 26.36186338442336
+locomotion_Wh = 857.2936679411675
+survival_Wh = 50.49837484920245
+total_Wh = 907.79204279037
+least_energy_speed_m_per_s = 0.1
+least_energy_Wh = 417.1739046554374
+most_sorties_speed_m_per_s = 0.58
+most_sorties_per_week = 5.604391468511957
+chosen = false
+
+# Energy against speed, on the chosen route.
+
 [[speed]]
 speed_m_per_s = 0.1
-hours = 140.15117574337447
-locomotion_Wh = 424.5389972784272
-survival_Wh = 1653.783873771819
-total_Wh = 2078.3228710502462
-sorties_per_week = 1.1069716627065784
+walking_hours = 15.834227954826895
+sortie_hours = 19.834227954826893
+locomotion_Wh = 46.789583796272254
+survival_Wh = 69.18163410199499
+total_Wh = 115.97121789826724
+sorties_per_week = 8.211209021377593
 
 [[speed]]
 speed_m_per_s = 0.18
-hours = 77.86176430187473
-locomotion_Wh = 467.9019988373573
-survival_Wh = 918.7688187621219
-total_Wh = 1386.6708175994793
-sorties_per_week = 1.9623680067039802
+walking_hours = 8.796793308237165
+sortie_hours = 12.796793308237165
+locomotion_Wh = 51.79584997771348
+survival_Wh = 59.412018945552774
+total_Wh = 111.20786892326626
+sorties_per_week = 12.540395573370342
 
 [[speed]]
 speed_m_per_s = 0.26
-hours = 53.90429836283634
-locomotion_Wh = 540.5059007599258
-survival_Wh = 636.0707206814689
-total_Wh = 1176.5766214413948
-sorties_per_week = 2.7778087912289857
+walking_hours = 6.090087674933422
+sortie_hours = 10.090087674933422
+locomotion_Wh = 60.574565686178765
+survival_Wh = 55.65447465461346
+total_Wh = 116.22904034079222
+sorties_per_week = 15.675900350920209
 
 [[speed]]
 speed_m_per_s = 0.33999999999999997
-hours = 41.22093404216897
-locomotion_Wh = 651.8711388617988
-survival_Wh = 486.4070216975939
-total_Wh = 1138.2781605593927
-sorties_per_week = 3.5307514961872495
+walking_hours = 4.657125869066735
+sortie_hours = 8.657125869066736
+locomotion_Wh = 74.13734666015591
+survival_Wh = 53.66518650058676
+total_Wh = 127.80253316074268
+sorties_per_week = 17.974528626044687
 
 [[speed]]
 speed_m_per_s = 0.42000000000000004
-hours = 33.369327557946306
-locomotion_Wh = 817.1752747192049
-survival_Wh = 393.75806518376646
-total_Wh = 1210.9333399029715
-sorties_per_week = 4.185732039738352
+walking_hours = 3.7700542749587846
+sortie_hours = 7.770054274958785
+locomotion_Wh = 94.11059772182628
+survival_Wh = 52.43372240523691
+total_Wh = 146.5443201270632
+sorties_per_week = 19.624813713719252
 
 [[speed]]
 speed_m_per_s = 0.5
-hours = 28.030235148674898
-locomotion_Wh = 1072.446950401838
-survival_Wh = 330.7567747543638
-total_Wh = 1403.2037251562017
-sorties_per_week = 4.683355712254629
+walking_hours = 3.166845590965379
+sortie_hours = 7.166845590965379
+locomotion_Wh = 123.93018768473004
+survival_Wh = 51.596326820399
+total_Wh = 175.52651450512906
+sorties_per_week = 20.705650514362105
 
 [[speed]]
 speed_m_per_s = 0.58
-hours = 24.16399581782319
-locomotion_Wh = 1494.3369546428978
-survival_Wh = 285.1351506503136
-total_Wh = 1779.4721052932114
-sorties_per_week = 4.925506952441685
+walking_hours = 2.730039302556362
+sortie_hours = 6.730039302556362
+locomotion_Wh = 170.30384279344602
+survival_Wh = 50.989936914137076
+total_Wh = 221.2937797075831
+sorties_per_week = 21.201912610739743
 
 [[speed]]
 speed_m_per_s = 0.66
-hours = 21.235026627784013
-locomotion_Wh = 2477.920638738145
-survival_Wh = 250.57331420785135
-total_Wh = 2728.493952945996
-sorties_per_week = 4.604936951142692
+walking_hours = 2.399125447701045
+sortie_hours = 6.399125447701045
+locomotion_Wh = 279.8145679704776
+survival_Wh = 50.530550621514394
+total_Wh = 330.345118591992
+sorties_per_week = 20.534936533415575
 
 [optima]
-least_energy_speed_m_per_s = 0.32
-least_energy_Wh = 1136.4001863981211
+least_energy_speed_m_per_s = 0.16
+least_energy_Wh = 111.17849282954106
 most_sorties_speed_m_per_s = 0.6
-most_sorties_per_week = 4.928536664358577
+most_sorties_per_week = 21.210184922885485
 gait_speed_cap_m_per_s = 0.6794189827204771
 
 # Which of the three binds, now that three compete.
 [binding]
 statement = """
 Charge does not bind. A modest array at the crest recharges a sortie's
-battery in hours against a sortie that takes days, so throughput is set
-by how long the walk takes rather than how long the waiting takes.
+battery in hours against a sortie that also takes hours, so throughput
+is set by how long the walk takes rather than how long the waiting
+takes.
 
-What binds is duration, and duration is a choice. Sortie energy is least
-at about a third of a metre per second, where rising swing work meets
-falling survival energy. Throughput is greatest at roughly twice that,
-because a shorter sortie repeats sooner even when it costs more -- until
-slip runs away near the gait limit from rung three and throughput falls
-again.
+What binds is duration, and duration is a choice. Survival is charged
+for the hours actually spent cold: the dwell, plus the shadowed final
+approach, which on this route is about an eighth of the walk. So it is
+mostly a fixed cost with a small speed-dependent part, and the energy
+minimum it produces is shallow and sits near a sixth of a metre per
+second. Throughput rises with speed until slip runs away near the gait
+limit from rung three, and then falls.
 
-So there is no single best speed, and which one to walk is a mission
-decision between energy and throughput rather than a physical limit.
+That minimum is a property of the route rather than of the platform.
+A shadowed approach is roughly a fixed length, so it is an eighth of the
+nearest route and under two percent of the deepest, and on the two
+longer routes survival is too nearly constant in speed to bend the sum
+at all. Their least-energy speed is simply the slowest speed swept, and
+the per-target blocks above report it as such rather than as an
+optimum.
+
+An earlier version of this study put that minimum at twice the speed
+and made much more of it. That was an artifact of the route: charging
+survival power over a fifty-six hour traverse that should never have
+been the mission made the falling term far larger than it is. The trade
+is real but it is shallow, and between the least-energy and
+most-throughput speeds the energy penalty is about a factor of two for
+roughly a doubling of sorties.
 """
 
 # Of 9 quantities, 3 sit inside a published range, 1 outside one, and 5 have no published range at all.
@@ -168,7 +251,7 @@ quantity = "array area and efficiency"
 published_range = "none"
 used = "0.5 m2 at 30%"
 status = "no_published_range"
-basis = "assumed, and it does not bind: recharge takes hours against a sortie of days, so throughput is limited by walking rather than by waiting"
+basis = "assumed, and it does not bind: recharge takes hours against a sortie that also takes hours, so throughput is limited by walking rather than by waiting"
 
 [[boundary_row]]
 quantity = "array pointing"
@@ -194,6 +277,6 @@ basis = "light scattered from sunlit walls reaches shadowed floors, which Shadow
 [[boundary_row]]
 quantity = "destination shadowing"
 published_range = "none"
-used = "87.7% lit at the crest, 0% at the destination"
+used = "90.8% lit at the crest, 0% at the destination"
 status = "inside_published_range"
 basis = "closes the boundary row open since Day 7: the route ends in permanent shadow, and that conclusion survives a wider horizon"

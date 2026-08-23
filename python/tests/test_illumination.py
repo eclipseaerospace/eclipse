@@ -295,3 +295,69 @@ def test_darkness_survives_a_wider_horizon_search_but_light_may_not() -> None:
         )
 
     assert searched(2000.0) >= searched(400.0) - 1e-9
+
+
+def test_a_point_is_lit_the_same_whoever_it_is_computed_beside() -> None:
+    # A single latitude for a whole batch made each point's illumination depend
+    # on its companions: over a twenty-kilometre polar window the batch mean
+    # moves by two thirds of a degree, against an obliquity of 1.54. The runner
+    # that found this read one crest as 87.7% lit beside a far corner and 90.4%
+    # beside a near one, for no reason on the ground.
+    raster = raster_from(np.zeros((300, 300)), cell_size_m=40.0)
+    rows = np.array([150, 40])
+    columns = np.array([150, 40])
+    latitudes = np.array([-87.5, -89.5])
+    north = np.array([0.0, 137.0])
+    horizon = horizon_elevation_deg(
+        raster, rows=rows, columns=columns, azimuths=24, samples_along_ray=40
+    )
+    together = illumination_fraction(
+        horizon=horizon, latitude_deg=latitudes, north_azimuth_deg=north
+    )
+    averaged = illumination_fraction(
+        horizon=horizon,
+        latitude_deg=float(latitudes.mean()),
+        north_azimuth_deg=north,
+    )
+    for index in range(2):
+        alone = illumination_fraction(
+            horizon=horizon_elevation_deg(
+                raster,
+                rows=rows[index : index + 1],
+                columns=columns[index : index + 1],
+                azimuths=24,
+                samples_along_ray=40,
+            ),
+            latitude_deg=float(latitudes[index]),
+            north_azimuth_deg=north[index : index + 1],
+        )
+        assert float(together.lit_fraction[index]) == pytest.approx(
+            float(alone.lit_fraction[0])
+        )
+        # And the old behaviour would have failed that, so the check is not
+        # passing on a quantity that happens to be insensitive to latitude.
+        assert float(averaged.lit_fraction[index]) != pytest.approx(
+            float(alone.lit_fraction[0])
+        )
+
+
+def test_a_batch_latitude_is_broadcast_when_it_is_one_value() -> None:
+    raster = raster_from(np.zeros((200, 200)), cell_size_m=20.0)
+    horizon = horizon_elevation_deg(
+        raster,
+        rows=np.array([100, 60]),
+        columns=np.array([100, 60]),
+        azimuths=24,
+        samples_along_ray=40,
+    )
+    north = np.array([0.0, 137.0])
+    scalar = illumination_fraction(
+        horizon=horizon, latitude_deg=-89.0, north_azimuth_deg=north
+    )
+    array = illumination_fraction(
+        horizon=horizon,
+        latitude_deg=np.array([-89.0, -89.0]),
+        north_azimuth_deg=north,
+    )
+    assert np.allclose(scalar.lit_fraction, array.lit_fraction)
+    assert np.allclose(scalar.penumbral_fraction, array.penumbral_fraction)

@@ -185,12 +185,12 @@ def horizon_elevation_deg(
 
 def solar_elevation_deg(
     *,
-    latitude_deg: float,
+    latitude_deg: NDArray[np.float64] | float,
     subsolar_latitude_deg: NDArray[np.float64],
     hour_angle_deg: NDArray[np.float64],
 ) -> NDArray[np.float64]:
     """Elevation of the Sun's centre above the local horizontal plane."""
-    latitude = math.radians(latitude_deg)
+    latitude = np.radians(latitude_deg)
     declination = np.radians(subsolar_latitude_deg)
     hour = np.radians(hour_angle_deg)
     sine = np.sin(latitude) * np.sin(declination) + np.cos(latitude) * np.cos(
@@ -201,13 +201,13 @@ def solar_elevation_deg(
 
 def _solar_azimuth_deg(
     *,
-    latitude_deg: float,
+    latitude_deg: NDArray[np.float64] | float,
     subsolar_latitude_deg: NDArray[np.float64],
     hour_angle_deg: NDArray[np.float64],
     elevation_deg: NDArray[np.float64],
 ) -> NDArray[np.float64]:
     """Azimuth east of north, from the standard spherical triangle."""
-    latitude = math.radians(latitude_deg)
+    latitude = np.radians(latitude_deg)
     declination = np.radians(subsolar_latitude_deg)
     elevation = np.radians(elevation_deg)
     cosine = (np.sin(declination) - np.sin(latitude) * np.sin(elevation)) / (
@@ -235,7 +235,7 @@ class Illumination:
 def illumination_fraction(
     *,
     horizon: HorizonMap,
-    latitude_deg: float,
+    latitude_deg: NDArray[np.float64] | float,
     north_azimuth_deg: NDArray[np.float64],
     lunation_samples: int = 180,
     season_samples: int = 9,
@@ -251,6 +251,12 @@ def illumination_fraction(
     from north, and the raster frame the horizon is stored in. It varies from
     point to point in a polar projection because every meridian points a
     different way on the grid.
+
+    latitude_deg is per point, or one value broadcast over all of them. A
+    twenty-kilometre window near a pole spans two thirds of a degree of
+    latitude, which is a large fraction of the obliquity that drives the
+    seasonal sweep, so a single mean latitude for a batch makes each point's
+    illumination depend on which other points were computed alongside it.
     """
     hour = np.linspace(0.0, 360.0, lunation_samples, endpoint=False)
     declination = np.linspace(
@@ -258,29 +264,31 @@ def illumination_fraction(
     )
     hour_grid, declination_grid = np.meshgrid(hour, declination, indexing="ij")
 
-    elevation = solar_elevation_deg(
-        latitude_deg=latitude_deg,
-        subsolar_latitude_deg=declination_grid,
-        hour_angle_deg=hour_grid,
-    )
-    azimuth_from_north = _solar_azimuth_deg(
-        latitude_deg=latitude_deg,
-        subsolar_latitude_deg=declination_grid,
-        hour_angle_deg=hour_grid,
-        elevation_deg=elevation,
-    )
-
     points = horizon.elevation_deg.shape[0]
+    latitude = np.broadcast_to(
+        np.asarray(latitude_deg, dtype=np.float64), (points,)
+    )
     lit = np.zeros(points, dtype=np.float64)
     penumbral = np.zeros(points, dtype=np.float64)
-    flat_elevation = elevation.ravel()
-    flat_azimuth = azimuth_from_north.ravel()
+    wrapped_azimuth = np.concatenate([horizon.azimuth_deg, [360.0]])
 
     for index in range(points):
+        elevation = solar_elevation_deg(
+            latitude_deg=float(latitude[index]),
+            subsolar_latitude_deg=declination_grid,
+            hour_angle_deg=hour_grid,
+        )
+        flat_elevation = elevation.ravel()
+        flat_azimuth = _solar_azimuth_deg(
+            latitude_deg=float(latitude[index]),
+            subsolar_latitude_deg=declination_grid,
+            hour_angle_deg=hour_grid,
+            elevation_deg=elevation,
+        ).ravel()
         raster_azimuth = np.mod(flat_azimuth + north_azimuth_deg[index], 360.0)
         blocked = np.interp(
             raster_azimuth,
-            np.concatenate([horizon.azimuth_deg, [360.0]]),
+            wrapped_azimuth,
             np.concatenate(
                 [horizon.elevation_deg[index], horizon.elevation_deg[index, :1]]
             ),
