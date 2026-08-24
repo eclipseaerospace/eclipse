@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Mons Mouton Plateau — an Artemis III candidate landing region, as a
+# parameter vector rather than a place.
+#
+# Assigned from an archive directory that predates the region name. This is
+# the one site here whose product-to-region mapping rests on a renaming rather
+# than on a matching name, and it is flagged rather than resolved.
+#
+# What is citable about these regions is thin and it is worth being explicit
+# about why. NASA names the nine and states their approximate size; it does
+# not publish centre coordinates, and neither does the terrain archive. So
+# this file records the region name, the programme statement, the crew
+# comparison the legged case is argued against, and the identifier of the
+# terrain product analysed. Where the numbers come from is the product's own
+# extent, which the study reads from the file header rather than transcribing
+# here.
+#
+# The body field carries gravity and the soil parameter set, so a Mars slope
+# or a terrestrial analogue instantiates through this same file.
+
+schema_version = 2
+id             = "mons-mouton-plateau"
+
+[site]
+name       = "Mons Mouton Plateau"
+body       = "moon"
+soil       = "lunar-intercrater"
+gravity    = { value = 1.62, units = "m/s^2" }
+
+[region]
+candidate                 = true
+programme                 = "Artemis III candidate landing region, one of the nine announced October 2024"
+extent_km                 = 15.0
+extent_basis              = "NASA states the candidate regions are approximately 15 by 15 kilometres; stated of the set rather than of this region individually"
+source                    = "NASA (2024) NASA Provides Update on Artemis III Moon Landing Regions"
+
+# The human comparison, and the reason it is carried. Crew are limited to far
+# gentler ground than a legged platform, so the terrain a robot opens is
+# terrain crew cannot reach -- a stronger claim than reaching what they can.
+[region.crew_limit]
+maximum_slope_deg = 20.0
+traverse_range_km = 2.0
+source            = "Rice et al. (2023) LPSC, citing the Artemis III Science Definition Team report"
+
+# The terrain product actually analysed. Its extent is the
+# authoritative statement of where the numbers come from.
+[terrain]
+product      = "Site20_final_adj_5mpp_surf"
+product_name = "Site20: Leibnitz beta plateau"
+archive      = "NASA GSFC Planetary Geodynamics Data Archive"
+manifest     = "data/terrain/manifest.toml"
+name_basis   = "the PGDA collection README names Site20 'Leibnitz beta plateau'. The IAU named that massif Mons Mouton in 2023, so the plateau product corresponds to this region -- but NASA lists 'Mons Mouton' and 'Mons Mouton Plateau' as two separate candidate regions and the archive has one product for the area. The assignment to the plateau follows the archive's own word 'plateau' and is the weakest name match in this set"
+
+# Declared, so that an empty axis is visible rather than absent.
+[axes]
+entry_slope_distribution   = "populated"
+illumination_duty_cycle    = "populated"
+cold_trap_range_and_depth  = "populated"
+boulder_size_frequency     = "not measured"
+annual_maximum_temperature = "not measured"
+direct_to_earth_visibility = "not measured"

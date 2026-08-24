@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Slater Plain — an Artemis III candidate landing region, as a parameter
+# vector rather than a place.
+#
+# No high-resolution product exists in the archive this project reads. The
+# name suggests gentle ground, which is where a legged platform has least to
+# offer, so the absence is unlikely to be hiding a strong result.
+#
+# What is citable about these regions is thin and it is worth being explicit
+# about why. NASA names the nine and states their approximate size; it does
+# not publish centre coordinates, and neither does the terrain archive. So
+# this file records the region name, the programme statement, the crew
+# comparison the legged case is argued against, and the identifier of the
+# terrain product analysed. Where the numbers come from is the product's own
+# extent, which the study reads from the file header rather than transcribing
+# here.
+#
+# The body field carries gravity and the soil parameter set, so a Mars slope
+# or a terrestrial analogue instantiates through this same file.
+
+schema_version = 2
+id             = "slater-plain"
+
+[site]
+name       = "Slater Plain"
+body       = "moon"
+soil       = "lunar-intercrater"
+gravity    = { value = 1.62, units = "m/s^2" }
+
+[region]
+candidate                 = true
+programme                 = "Artemis III candidate landing region, one of the nine announced October 2024"
+extent_km                 = 15.0
+extent_basis              = "NASA states the candidate regions are approximately 15 by 15 kilometres; stated of the set rather than of this region individually"
+source                    = "NASA (2024) NASA Provides Update on Artemis III Moon Landing Regions"
+
+# The human comparison, and the reason it is carried. Crew are limited to far
+# gentler ground than a legged platform, so the terrain a robot opens is
+# terrain crew cannot reach -- a stronger claim than reaching what they can.
+[region.crew_limit]
+maximum_slope_deg = 20.0
+traverse_range_km = 2.0
+source            = "Rice et al. (2023) LPSC, citing the Artemis III Science Definition Team report"
+
+# No terrain product. Recorded as an absence rather than omitted,
+# because a candidate region this project cannot analyse is a
+# coverage gap and a silence is not.
+[terrain]
+absence  = "no 5 m product for this area appears in the PGDA 'High-Resolution LOLA Topography for Lunar South Pole Sites' collection, whose README enumerates its sites"
+
+# Declared, so that an empty axis is visible rather than absent.
+[axes]
+entry_slope_distribution   = "not measured"
+illumination_duty_cycle    = "not measured"
+cold_trap_range_and_depth  = "not measured"
+boulder_size_frequency     = "not measured"
+annual_maximum_temperature = "not measured"
+direct_to_earth_visibility = "not measured"

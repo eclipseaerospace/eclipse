@@ -35,9 +35,11 @@ from __future__ import annotations
 
 import math
 import struct
+import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import numpy as np
 from numpy.typing import NDArray
@@ -45,7 +47,9 @@ from numpy.typing import NDArray
 __all__ = [
     "GeoRaster",
     "TerrainFileError",
+    "TerrainProduct",
     "latitude_of_radius",
+    "load_terrain_manifest",
     "model_to_latitude_longitude",
     "point_scale_factor",
     "read_float_geotiff",
@@ -229,6 +233,15 @@ def read_float_geotiff(path: Path | str) -> GeoRaster:
     tiepoint = tags[TAG_MODEL_TIEPOINT]
 
     start = int(tags[TAG_STRIP_OFFSETS][0])
+    needed = start + rows * columns * 4
+    if len(raw) < needed:
+        raise TerrainFileError(
+            f"{source}: the header declares {rows} by {columns} float32 samples "
+            f"starting at byte {start}, which needs {needed} bytes, and the file "
+            f"holds {len(raw)}. It is {needed - len(raw)} bytes short, which is "
+            "what a truncated download looks like; check it against the byte "
+            "count in the terrain manifest"
+        )
     values = np.frombuffer(
         raw, dtype="<f4", count=rows * columns, offset=start
     ).reshape(rows, columns)
@@ -240,3 +253,59 @@ def read_float_geotiff(path: Path | str) -> GeoRaster:
         cell_size_m=scale_x,
         reference_radius_m=1737400.0,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class TerrainProduct:
+    """One archived product: where it came from and how to know it is intact.
+
+    The grid block is optional and redundant when present -- the reader takes
+    the geometry from the file header -- which is what makes it worth having:
+    a declaration the reader can be checked against rather than a declaration
+    the reader depends on.
+    """
+
+    id: str
+    description: str
+    url: str
+    sha256: str
+    byte_count: int
+    kind: str
+    quality: Mapping[str, Any]
+    grid: Mapping[str, Any] | None
+
+    @property
+    def filename(self) -> str:
+        return f"{self.id}.tif"
+
+
+def load_terrain_manifest(path: Path | str) -> dict[str, TerrainProduct]:
+    """Every product the manifest declares, by identifier.
+
+    Nothing here reads a product id from anywhere but this file. A study that
+    hardcodes one has quietly become a study about one place, which is how the
+    single-site assumption survived ten days.
+    """
+    location = Path(path)
+    table = tomllib.loads(location.read_text(encoding="utf-8"))
+    products: dict[str, TerrainProduct] = {}
+    for entry in table.get("product", ()):
+        identifier = str(entry["id"])
+        if identifier in products:
+            raise ValueError(
+                f"{location} declares the product id {identifier!r} twice; "
+                "identifiers resolve to filenames and must be unique"
+            )
+        products[identifier] = TerrainProduct(
+            id=identifier,
+            description=str(entry["description"]),
+            url=str(entry["url"]),
+            sha256=str(entry["sha256"]),
+            byte_count=int(entry["bytes"]),
+            kind=str(entry["kind"]),
+            quality=dict(entry.get("quality", {})),
+            grid=dict(entry["grid"]) if "grid" in entry else None,
+        )
+    if not products:
+        raise ValueError(f"{location} declares no terrain products")
+    return products

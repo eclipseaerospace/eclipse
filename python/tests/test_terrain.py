@@ -25,6 +25,7 @@ from eclipse.io.terrain import (
     GeoRaster,
     TerrainFileError,
     latitude_of_radius,
+    load_terrain_manifest,
     model_to_latitude_longitude,
     point_scale_factor,
     read_float_geotiff,
@@ -39,7 +40,8 @@ from eclipse.terrain import (
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 TERRAIN = REPOSITORY_ROOT / "data" / "terrain"
-ELEVATION = TERRAIN / "SL2_final_adj_5mpp_surf.tif"
+PRODUCT_ID = "SL2_final_adj_5mpp_surf"
+ELEVATION = TERRAIN / f"{PRODUCT_ID}.tif"
 PUBLISHED_SLOPE = TERRAIN / "SL2_final_adj_5mpp_slp.tif"
 
 LUNAR_RADIUS_M = 1737400.0
@@ -135,6 +137,57 @@ def test_a_file_that_is_not_a_tiff_is_refused(tmp_path: Path) -> None:
     path.write_bytes(b"MM\x00\x2a" + b"\x00" * 64)
     with pytest.raises(TerrainFileError, match="little-endian"):
         read_float_geotiff(path)
+
+
+@needs_product
+def test_a_truncated_product_is_named_as_truncated(tmp_path: Path) -> None:
+    # An archive can serve a partial file and report success, and one did. The
+    # byte count in the manifest catches it; this is the reader saying so in
+    # words rather than failing inside numpy with "buffer is smaller than
+    # requested size".
+    source = REPOSITORY_ROOT / "data" / "terrain" / f"{PRODUCT_ID}.tif"
+    path = tmp_path / "short.tif"
+    path.write_bytes(source.read_bytes()[: 1 << 20])
+    with pytest.raises(TerrainFileError, match="bytes short"):
+        read_float_geotiff(path)
+
+
+# --- the manifest, which is what stands in for committing the products
+
+
+def test_the_manifest_resolves_every_product_it_declares() -> None:
+    products = load_terrain_manifest(
+        REPOSITORY_ROOT / "data" / "terrain" / "manifest.toml"
+    )
+    assert PRODUCT_ID in products
+    for identifier, product in products.items():
+        assert product.filename == f"{identifier}.tif"
+        assert product.url.endswith(product.filename)
+        assert len(product.sha256) == 64
+        assert product.byte_count > 0
+
+
+def test_a_manifest_declaring_one_identifier_twice_is_refused(tmp_path: Path) -> None:
+    entry = """
+[[product]]
+id = "twice"
+description = "d"
+url = "https://example.invalid/twice.tif"
+sha256 = "0"
+bytes = 1
+kind = "elevation"
+"""
+    path = tmp_path / "manifest.toml"
+    path.write_text(entry + entry, encoding="utf-8")
+    with pytest.raises(ValueError, match="declares the product id 'twice' twice"):
+        load_terrain_manifest(path)
+
+
+def test_a_manifest_with_no_products_is_refused(tmp_path: Path) -> None:
+    path = tmp_path / "manifest.toml"
+    path.write_text("schema_version = 1\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="declares no terrain products"):
+        load_terrain_manifest(path)
 
 
 # --- slope, identified rather than assumed

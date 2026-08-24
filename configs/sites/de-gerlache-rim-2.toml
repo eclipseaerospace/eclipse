@@ -8,9 +8,9 @@
 # than code. The body field carries gravity and the soil parameter set, so a
 # Mars slope or a terrestrial analogue instantiates through this same file.
 #
-# Only the slope axis is populated. The other five are declared and left empty,
-# which is honest about what has been measured and stops the schema being
-# retrofitted around whichever axis happened to be first.
+# Three axes are populated and three are declared and left empty, which is
+# honest about what has been measured and stops the schema being retrofitted
+# around whichever axis happened to be first.
 #
 # On the relationship to a biome: a biome is a named environment definition and
 # a site is a named place within one. This file points at its body rather than
@@ -25,7 +25,7 @@
 # but they are not the same claim, and the discrepancy is stated rather than
 # averaged away.
 
-schema_version = 1
+schema_version = 2
 id             = "de-gerlache-rim-2"
 
 [site]
@@ -33,11 +33,12 @@ name       = "de Gerlache Rim 2"
 body       = "moon"
 soil       = "lunar-intercrater"
 gravity    = { value = 1.62, units = "m/s^2" }
-status     = "slope_axis_only"
+status     = "slope, illumination and cold-trap axes populated"
 
 # What NASA states about the region, quotable and without coordinates.
 [region]
-programme                 = "Artemis III candidate landing region"
+candidate                 = true
+programme                 = "Artemis III candidate landing region, one of the nine announced October 2024"
 extent_km                 = 15.0
 extent_basis              = "NASA: regions are approximately 15 by 15 kilometers"
 landing_site_radius_m     = 100.0
@@ -74,8 +75,8 @@ discrepancy       = "53.7 km measured against NASA's stated 50 km for the region
 # widening a schema built around slope.
 [axes]
 entry_slope_distribution   = "populated"
-illumination_duty_cycle    = "not measured"
-cold_trap_range_and_depth  = "not measured"
+illumination_duty_cycle    = "populated"
+cold_trap_range_and_depth  = "populated"
 boulder_size_frequency     = "not measured"
 annual_maximum_temperature = "not measured"
 direct_to_earth_visibility = "not measured"

@@ -69,3 +69,145 @@ sha256        = "58f3372c35bbd6baf38ffd5633c1c96b59bd89dbd252150581d12893a43136e
 bytes         = 40980806
 retrieved     = 2026-08-21
 kind          = "elevation"
+
+# The rest of the collection, fetched on day eleven so that the site
+# abstraction could stop holding one instance. The quality block is
+# collection-wide rather than per product: the producers state the
+# interpolated fraction and the error budgets of these polar LDEMs as a set,
+# and repeating them per entry would imply nine independent statements where
+# there is one.
+#
+# Grid geometry is deliberately not transcribed for these. The reader takes it
+# from the file header, and a second copy here would be a second thing to keep
+# right. SL2 keeps its block because it is the one product whose declaration
+# has been checked against the reader.
+#
+# Window sizes are not uniform across the collection -- 16, 20, 21 and 30 km --
+# which is why the study crops to a common centred window rather than comparing
+# products of different extent.
+
+[[product]]
+id            = "Site01_final_adj_5mpp_surf"
+description   = "Connecting ridge, LOLA-derived elevation, track-adjusted"
+archive       = "NASA GSFC Planetary Geodynamics Data Archive"
+collection    = "High-Resolution LOLA Topography for Lunar South Pole Sites"
+directory     = "Site01"
+name_basis    = "the collection README names this directory 'Connecting ridge'"
+url           = "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site01/Site01_final_adj_5mpp_surf.tif"
+sha256        = "3ba7b97cb00a2bcf21189c3aeb535f65afc21207154ab9f0d43c5bdc1f7e747e"
+bytes         = 40980810
+retrieved     = 2026-08-24
+kind          = "elevation"
+
+[[product]]
+id            = "Site04_final_adj_5mpp_surf"
+description   = "Shackleton rim, LOLA-derived elevation, track-adjusted"
+archive       = "NASA GSFC Planetary Geodynamics Data Archive"
+collection    = "High-Resolution LOLA Topography for Lunar South Pole Sites"
+directory     = "Site04"
+name_basis    = "the collection README names this directory 'Shackleton rim'"
+url           = "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site04/Site04_final_adj_5mpp_surf.tif"
+sha256        = "38ff70dbdf2f066c2cfa94a646c3a59d653ce7f6b4528b15fc1b43ee397ce758"
+bytes         = 40980806
+retrieved     = 2026-08-24
+kind          = "elevation"
+
+[[product]]
+id            = "Site06_final_adj_5mpp_surf"
+description   = "Nobile rim 1, LOLA-derived elevation, track-adjusted"
+archive       = "NASA GSFC Planetary Geodynamics Data Archive"
+collection    = "High-Resolution LOLA Topography for Lunar South Pole Sites"
+directory     = "Site06"
+name_basis    = "the collection README names this directory 'Nobile rim 1'"
+url           = "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site06/Site06_final_adj_5mpp_surf.tif"
+sha256        = "cca17e8067601dd659b583f889204db6bce685bc30c60a9e62427a8bce36b03d"
+bytes         = 64025603
+retrieved     = 2026-08-24
+kind          = "elevation"
+
+[[product]]
+id            = "Site07_final_adj_5mpp_surf"
+description   = "Peak near Shackleton, LOLA-derived elevation, track-adjusted"
+archive       = "NASA GSFC Planetary Geodynamics Data Archive"
+collection    = "High-Resolution LOLA Topography for Lunar South Pole Sites"
+directory     = "Site07"
+name_basis    = "the collection README names this directory 'Peak near Shackleton'"
+url           = "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site07/Site07_final_adj_5mpp_surf.tif"
+sha256        = "38aaee10bb4da4d63e7427aa1ca25c79bdbc649d212079a04990e135462091f8"
+bytes         = 40980808
+retrieved     = 2026-08-24
+kind          = "elevation"
+
+[[product]]
+id            = "Site20_final_adj_5mpp_surf"
+description   = "Leibnitz beta plateau, LOLA-derived elevation, track-adjusted"
+archive       = "NASA GSFC Planetary Geodynamics Data Archive"
+collection    = "High-Resolution LOLA Topography for Lunar South Pole Sites"
+directory     = "Site20"
+name_basis    = "the collection README names this directory 'Leibnitz beta plateau'"
+url           = "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site20/Site20_final_adj_5mpp_surf.tif"
+sha256        = "e51451f3629ba7cd5cfc1b32c8c0ee3c5c454607488b00ea00cd06a9e301a892"
+bytes         = 40980802
+retrieved     = 2026-08-24
+kind          = "elevation"
+
+[[product]]
+id            = "Site23_final_adj_5mpp_surf"
+description   = "Malapert massif, LOLA-derived elevation, track-adjusted"
+archive       = "NASA GSFC Planetary Geodynamics Data Archive"
+collection    = "High-Resolution LOLA Topography for Lunar South Pole Sites"
+directory     = "Site23"
+name_basis    = "the collection README names this directory 'Malapert massif'"
+url           = "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Site23/Site23_final_adj_5mpp_surf.tif"
+sha256        = "12d280a59cd7580415f6bada638d0abe025ce6727541fddf68d5dc371a6c94cf"
+bytes         = 70586804
+retrieved     = 2026-08-24
+kind          = "elevation"
+
+[[product]]
+id            = "Haworth_final_adj_5mpp_surf"
+description   = "Haworth, LOLA-derived elevation, track-adjusted"
+archive       = "NASA GSFC Planetary Geodynamics Data Archive"
+collection    = "High-Resolution LOLA Topography for Lunar South Pole Sites"
+directory     = "Haworth"
+name_basis    = "the collection README names this directory 'Haworth'"
+url           = "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Haworth/Haworth_final_adj_5mpp_surf.tif"
+sha256        = "387fd6e99bca266f4982f7256c4c185921105313882b4c2eee5b5ff1ef75016b"
+bytes         = 142123767
+retrieved     = 2026-08-24
+kind          = "elevation"
+
+[[product]]
+id            = "Shoemaker_final_adj_5mpp_surf"
+description   = "Shoemaker, LOLA-derived elevation, track-adjusted"
+archive       = "NASA GSFC Planetary Geodynamics Data Archive"
+collection    = "High-Resolution LOLA Topography for Lunar South Pole Sites"
+directory     = "Shoemaker"
+name_basis    = "the collection README names this directory 'Shoemaker'"
+url           = "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/Shoemaker/Shoemaker_final_adj_5mpp_surf.tif"
+sha256        = "75329262a6dbe37e4370adcf23ec3854396c9d3e911a682d76c170178a0b8290"
+bytes         = 64025605
+retrieved     = 2026-08-24
+kind          = "elevation"
+
+[[product]]
+id            = "DM2_final_adj_5mpp_surf"
+description   = "Nobile rim 2, LOLA-derived elevation, track-adjusted"
+archive       = "NASA GSFC Planetary Geodynamics Data Archive"
+collection    = "High-Resolution LOLA Topography for Lunar South Pole Sites"
+directory     = "DM2"
+name_basis    = "the collection README names this directory 'Nobile rim 2'"
+url           = "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/DM2/DM2_final_adj_5mpp_surf.tif"
+sha256        = "d88677c21633683061117db0a577f0510e0948fe9db315d13be28782407ff604"
+bytes         = 64025607
+retrieved     = 2026-08-24
+kind          = "elevation"
+
+# Stated by the producers for the collection as a whole.
+[collection.quality]
+interpolated_pixel_fraction = 0.90
+interpolated_basis          = "producers: the fraction of interpolated 5-m pixels in these polar LDEMs is necessarily large (~90%) due to LOLA's cross-track and inter-spot spacing"
+median_rms_height_error_m   = [0.30, 0.50]
+median_rms_slope_error_deg  = [1.5, 2.5]
+track_geolocation_error_m   = [0.10, 0.20]
+reference                   = "Barker MK et al. (2021) Planetary and Space Science 203, 105119"

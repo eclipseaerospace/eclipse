@@ -63,7 +63,6 @@ import math
 import platform as host_platform
 import textwrap
 import tomllib
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final, cast
 
@@ -94,6 +93,7 @@ from eclipse.analysis.style import (
     INK_SECONDARY,
     figure_style,
 )
+from eclipse.io.site import Site, load_site
 from eclipse.io.terrain import GeoRaster, read_float_geotiff
 from eclipse.terrain import (
     NATURAL_TERRAIN_SLOPE_EXPONENT,
@@ -146,26 +146,6 @@ def caption(text: str, width: int = 148) -> str:
     return "\n".join(
         textwrap.fill(" ".join(paragraph.split()), width=width)
         for paragraph in text.split("\n")
-    )
-
-
-@dataclass(frozen=True, slots=True)
-class Site:
-    id: str
-    name: str
-    crew_slope_limit_deg: float
-    stated_distance_from_pole_km: float
-    stated_extent_km: float
-
-
-def load_site() -> Site:
-    table = tomllib.loads(SITE_PATH.read_text(encoding="utf-8"))
-    return Site(
-        id=table["id"],
-        name=table["site"]["name"],
-        crew_slope_limit_deg=table["region"]["crew_limit"]["maximum_slope_deg"],
-        stated_distance_from_pole_km=table["region"]["distance_from_pole_km"],
-        stated_extent_km=table["region"]["extent_km"],
     )
 
 
@@ -278,7 +258,7 @@ def build_sensitivity_figure(
             ACHIEVABLE_SLOPE_DEG, fraction * 100.0, color=ACCENT_PRIMARY, linewidth=1.8
         )
         left.axvspan(
-            site.crew_slope_limit_deg,
+            site.crew.maximum_slope_deg,
             TRACTION_LIMIT,
             color=ACCENT_SECONDARY,
             alpha=0.13,
@@ -286,7 +266,7 @@ def build_sensitivity_figure(
             label="terrain a legged platform opens that crew cannot reach",
         )
         for limit, label, colour in (
-            (site.crew_slope_limit_deg, f"crew {site.crew_slope_limit_deg:.0f}°", INK_PRIMARY),
+            (site.crew.maximum_slope_deg, f"crew {site.crew.maximum_slope_deg:.0f}°", INK_PRIMARY),
             (TIPPING_LIMIT, f"tipping {TIPPING_LIMIT:.1f}°", ACCENT_SECONDARY),
             (TRACTION_LIMIT, f"traction {TRACTION_LIMIT:.1f}°", ACCENT_SECONDARY),
         ):
@@ -316,7 +296,7 @@ def build_sensitivity_figure(
 
         right = axes[0][1]
         limits = (
-            (site.crew_slope_limit_deg, "crew"),
+            (site.crew.maximum_slope_deg, "crew"),
             (REPOSE_BAND[0], "repose low"),
             (TIPPING_LIMIT, "tipping"),
             (TRACTION_LIMIT, "traction"),
@@ -619,13 +599,13 @@ def build_map_figure(
             vmax=35.0,
             interpolation="nearest",
         )
-        crew_only = np.ma.masked_where(slope <= site.crew_slope_limit_deg, slope)
+        crew_only = np.ma.masked_where(slope <= site.crew.maximum_slope_deg, slope)
         panel.imshow(
             np.ones_like(slope),
             extent=(extent_km[0], extent_km[1], extent_km[2], extent_km[3]),
             origin="upper",
             cmap=matplotlib.colors.ListedColormap([ACCENT_SECONDARY]),
-            alpha=np.where(slope > site.crew_slope_limit_deg, 0.55, 0.0),
+            alpha=np.where(slope > site.crew.maximum_slope_deg, 0.55, 0.0),
             interpolation="nearest",
         )
         panel.imshow(
@@ -644,9 +624,9 @@ def build_map_figure(
         # Aggregating for display smooths the shading, so the shaded area here
         # is slightly smaller than the number in the headline, and saying so is
         # cheaper than quietly quoting whichever is larger.
-        beyond_crew = float((slope_at_native > site.crew_slope_limit_deg).mean())
+        beyond_crew = float((slope_at_native > site.crew.maximum_slope_deg).mean())
         beyond_robot = float((slope_at_native > TRACTION_LIMIT).mean())
-        shown_beyond_crew = float((slope > site.crew_slope_limit_deg).mean())
+        shown_beyond_crew = float((slope > site.crew.maximum_slope_deg).mean())
         figure.suptitle(
             f"{site.name}: {beyond_crew:.1%} of the site is closed to crew and "
             "open to legs",
@@ -661,7 +641,7 @@ def build_map_figure(
             0.900,
             caption(
                 f"Slope from LOLA at 5 m, where {beyond_crew:.2%} of cells exceed "
-                f"the {site.crew_slope_limit_deg:.0f}° limit the Artemis III "
+                f"the {site.crew.maximum_slope_deg:.0f}° limit the Artemis III "
                 "Science Definition Team places on crew, and a legged platform's "
                 "limits admit. Shown aggregated to "
                 f"{cell:.0f} m, which smooths the shading to {shown_beyond_crew:.2%}.\n"
@@ -870,7 +850,7 @@ def build_report(
     ]
 
     for limit, label in (
-        (site.crew_slope_limit_deg, "crew"),
+        (site.crew.maximum_slope_deg, "crew"),
         (REPOSE_BAND[0], "repose_low"),
         (REPOSE_BAND[1], "repose_high"),
         (TIPPING_LIMIT, "tipping"),
@@ -895,10 +875,10 @@ def build_report(
         "[robot_only_terrain]",
         "fraction = "
         + _format_float(
-            float((slope > site.crew_slope_limit_deg).mean())
+            float((slope > site.crew.maximum_slope_deg).mean())
             - float((slope > TRACTION_LIMIT).mean())
         ),
-        f"between_deg = [{_format_float(site.crew_slope_limit_deg)}, "
+        f"between_deg = [{_format_float(site.crew.maximum_slope_deg)}, "
         f"{_format_float(TRACTION_LIMIT)}]",
         "",
         "# The scale result. For a self-affine surface mean slope goes as the",
@@ -990,7 +970,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
-    site, quality = load_site(), load_quality()
+    site, quality = load_site(SITE_PATH), load_quality()
     elevation = read_float_geotiff(ELEVATION_PATH)
     slope = slope_degrees(
         elevation.values, cell_size_m=elevation.cell_size_m, method=SLOPE_METHOD
