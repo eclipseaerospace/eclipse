@@ -94,6 +94,7 @@ from eclipse.io.site import AXIS_NAMES, Site, load_sites
 from eclipse.io.soil import janosi_hanamoto_model, load_soil, mohr_coulomb_model
 from eclipse.io.terrain import (
     GeoRaster,
+    centred_window,
     latitudes_degrees,
     load_terrain_manifest,
     north_azimuth_degrees,
@@ -320,15 +321,6 @@ class Survey:
         )
 
 
-def common_window(raster: GeoRaster) -> tuple[int, int, int, int]:
-    """Row and column bounds of the common analysis window, centred."""
-    height, width = raster.shape
-    span = min(int(round(COMMON_WINDOW_KM * 1000.0 / raster.cell_size_m)), height, width)
-    first_row = (height - span) // 2
-    first_column = (width - span) // 2
-    return first_row, first_row + span, first_column, first_column + span
-
-
 def survey_site(
     site: Site,
     *,
@@ -349,7 +341,7 @@ def survey_site(
     window returns a survey saying so rather than raising, because that is a
     finding about the region.
     """
-    first_row, last_row, first_column, last_column = common_window(raster)
+    first_row, last_row, first_column, last_column = centred_window(raster, span_m=COMMON_WINDOW_KM * 1000.0)
     slope = slope_degrees(
         raster.values[first_row:last_row, first_column:last_column],
         cell_size_m=raster.cell_size_m,

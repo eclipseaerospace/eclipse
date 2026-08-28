@@ -66,6 +66,7 @@ __all__ = [
     "TraversalCost",
     "minimum_slope_capability_deg",
     "plan_route",
+    "round_trip_energy_J",
 ]
 
 # Eight-connected. Four-connected forbids diagonal travel and inflates every
@@ -404,3 +405,46 @@ def minimum_slope_capability_deg(
         else:
             low = middle
     return high
+
+
+def round_trip_energy_J(
+    *,
+    elevation_m: NDArray[np.float64],
+    cell_size_m: float,
+    home: tuple[int, int],
+    cost: TraversalCost,
+) -> NDArray[np.float64]:
+    """Energy to walk from home to every cell and back again, per cell.
+
+    Two searches rather than one doubled, because the graph is directed and
+    the return is not the outbound reversed: the cost out is a search from
+    home, and the cost back is a search from home over the transposed graph,
+    which is the same as asking every cell what it costs to reach home.
+
+    Infinite where no round trip exists in either direction. Returned as a
+    field rather than a number so a caller can ask how far a battery reaches
+    rather than only whether one destination is affordable -- which is the
+    question a descent into a crater actually poses, since the answer is a
+    depth rather than a yes.
+    """
+    height, width = elevation_m.shape
+    if not (0 <= home[0] < height and 0 <= home[1] < width):
+        raise ValueError(f"home {home} lies outside a {height} by {width} grid")
+    sources, targets, weights = _edges(
+        elevation_m, cell_size_m=cell_size_m, cost=cost
+    )
+    nodes = height * width
+    graph = cast(
+        Any, coo_matrix((weights, (sources, targets)), shape=(nodes, nodes))
+    ).tocsr()
+    del sources, targets, weights
+    origin = home[0] * width + home[1]
+    outward = np.asarray(
+        cast(Any, dijkstra(graph, directed=True, indices=origin)), dtype=np.float64
+    )
+    homeward = np.asarray(
+        cast(Any, dijkstra(graph.T.tocsr(), directed=True, indices=origin)),
+        dtype=np.float64,
+    )
+    del graph
+    return np.asarray((outward + homeward).reshape(height, width))

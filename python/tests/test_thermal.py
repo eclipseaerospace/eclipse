@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import math
 
-import numpy as np
 import pytest
 
 from eclipse.io.soil import load_soil, regolith_conductivity_W_per_m_K

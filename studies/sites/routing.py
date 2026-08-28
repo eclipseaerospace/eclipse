@@ -129,6 +129,7 @@ from eclipse.io.site import Site, load_sites
 from eclipse.io.soil import janosi_hanamoto_model, load_soil, mohr_coulomb_model
 from eclipse.io.terrain import (
     GeoRaster,
+    centred_window,
     latitudes_degrees,
     load_terrain_manifest,
     north_azimuth_degrees,
@@ -209,14 +210,6 @@ def caption(text: str, width: int = 148) -> str:
         textwrap.fill(" ".join(paragraph.split()), width=width)
         for paragraph in text.split("\n")
     )
-
-
-def common_window(raster: GeoRaster) -> tuple[int, int, int, int]:
-    height, width = raster.shape
-    span = min(int(round(COMMON_WINDOW_KM * 1000.0 / raster.cell_size_m)), height, width)
-    first_row = (height - span) // 2
-    first_column = (width - span) // 2
-    return first_row, first_row + span, first_column, first_column + span
 
 
 def illuminate(
@@ -494,7 +487,7 @@ def route_site(
     through the same library calls, so the only thing that differs between the
     two studies is what happens after the destination is chosen.
     """
-    first_row, last_row, first_column, last_column = common_window(raster)
+    first_row, last_row, first_column, last_column = centred_window(raster, span_m=COMMON_WINDOW_KM * 1000.0)
     grid_rows, grid_columns = np.meshgrid(
         np.arange(first_row, last_row, MAP_STRIDE),
         np.arange(first_column, last_column, MAP_STRIDE),

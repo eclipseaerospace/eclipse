@@ -487,13 +487,22 @@ def shadow_targets(
     columns: NDArray[np.int_],
     any_sunlight_fraction: NDArray[np.float64],
 ) -> dict[str, ShadowTarget]:
-    """Nearest, largest and deepest permanent shadow, from an illumination grid.
+    """Four candidate destinations in permanent shadow, from an illumination grid.
 
     rows and columns index the raster at the sampled points and carry the grid
     shape; any_sunlight_fraction is the illumination at those same points.
-    Regions are four-connected components of the fully dark cells. The largest
-    is entered at its nearest member rather than its centroid, because a
-    platform walks to the edge of a shadow and not into the middle of it.
+    Regions are four-connected components of the fully dark cells.
+
+    nearest, largest and deepest are entered at their nearest member rather
+    than their centroid, because a platform walks to the edge of a shadow and
+    not into the middle of it. That is the right target for asking whether a
+    cold trap can be reached at all, and the wrong one for asking whether the
+    science can be.
+
+    floor is the lowest ground inside the nearest region, which is a different
+    errand and the one a prospecting mission would actually fly. Volatiles
+    concentrate where a cold trap deepens, not where its shadow begins, so the
+    edge is where the mission arrives and the floor is where it works.
     """
     if rows.shape != columns.shape or rows.shape != any_sunlight_fraction.shape:
         raise ValueError(
@@ -552,6 +561,10 @@ def shadow_targets(
     nearest = np.unravel_index(
         int(np.argmin(np.where(dark, distance_m, np.inf))), dark.shape
     )
+    in_nearest = label == int(label[nearest])
+    floor = np.unravel_index(
+        int(np.argmax(np.where(in_nearest, drop, -np.inf))), dark.shape
+    )
     deepest = np.unravel_index(
         int(np.argmax(np.where(dark, drop, -np.inf))), dark.shape
     )
@@ -559,6 +572,7 @@ def shadow_targets(
     entry = members[int(np.argmin([distance_m[a, b] for a, b in members]))]
     return {
         "nearest": make("nearest", (int(nearest[0]), int(nearest[1]))),
+        "floor": make("floor", (int(floor[0]), int(floor[1]))),
         "largest": make("largest", (int(entry[0]), int(entry[1]))),
         "deepest": make("deepest", (int(deepest[0]), int(deepest[1]))),
     }

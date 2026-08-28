@@ -23,6 +23,7 @@ from eclipse.planning import (
     TraversalCost,
     minimum_slope_capability_deg,
     plan_route,
+    round_trip_energy_J,
 )
 
 SLOPES = np.linspace(-89.0, 89.0, 1781)
@@ -278,3 +279,61 @@ def test_the_neighbourhood_is_eight_connected_and_symmetric() -> None:
     assert len(set(NEIGHBOURS)) == 8
     for row_step, column_step in NEIGHBOURS:
         assert (-row_step, -column_step) in NEIGHBOURS
+
+
+# --- round trips, where the asymmetry is the whole point
+
+
+def test_a_round_trip_on_a_plane_is_twice_the_one_way() -> None:
+    field = round_trip_energy_J(
+        elevation_m=np.zeros((11, 11)),
+        cell_size_m=1.0,
+        home=(5, 5),
+        cost=flat_cost(),
+    )
+    assert field[5, 5] == pytest.approx(0.0)
+    assert field[0, 0] == pytest.approx(2.0 * 5.0 * np.sqrt(2.0))
+
+
+def test_a_round_trip_is_dearer_than_twice_the_cheap_direction() -> None:
+    # Down is cheap and up is dear, so a round trip to a low place costs more
+    # than twice the descent and less than twice the climb. A model that
+    # doubled either one would be wrong in a known direction.
+    rows, columns = np.meshgrid(np.arange(21), np.arange(21), indexing="ij")
+    values = -30.0 * columns.astype(float)
+    cost = climbing_cost(limit_deg=80.0)
+    field = round_trip_energy_J(
+        elevation_m=values, cell_size_m=10.0, home=(10, 0), cost=cost
+    )
+    down = plan_route(
+        elevation_m=values, cell_size_m=10.0, start=(10, 0), goal=(10, 20), cost=cost
+    )
+    up = plan_route(
+        elevation_m=values, cell_size_m=10.0, start=(10, 20), goal=(10, 0), cost=cost
+    )
+    assert down.route is not None and up.route is not None
+    assert field[10, 20] == pytest.approx(
+        down.route.total_energy_J + up.route.total_energy_J
+    )
+    assert field[10, 20] > 2.0 * down.route.total_energy_J
+    assert field[10, 20] < 2.0 * up.route.total_energy_J
+
+
+def test_an_unreachable_cell_has_no_round_trip() -> None:
+    values = np.zeros((21, 21))
+    values[:, 10] = 5000.0
+    field = round_trip_energy_J(
+        elevation_m=values, cell_size_m=10.0, home=(5, 2), cost=flat_cost(limit_deg=40.0)
+    )
+    assert np.isfinite(field[5, 5])
+    assert not np.isfinite(field[5, 18])
+
+
+def test_a_home_outside_the_grid_is_refused() -> None:
+    with pytest.raises(ValueError, match="lies outside a 5 by 5 grid"):
+        round_trip_energy_J(
+            elevation_m=np.zeros((5, 5)),
+            cell_size_m=1.0,
+            home=(9, 0),
+            cost=flat_cost(),
+        )

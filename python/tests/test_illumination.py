@@ -543,3 +543,55 @@ def test_a_fully_lit_grid_has_nowhere_to_send_a_sortie() -> None:
             columns=columns,
             any_sunlight_fraction=np.ones((8, 8)),
         )
+
+
+def test_the_floor_is_the_lowest_ground_of_the_nearest_shadow() -> None:
+    # Two cold traps: a near shallow one and a far deep one. nearest and floor
+    # both belong to the near region; deepest belongs to the far one. Which of
+    # those a mission wants is the difference between arriving and working.
+    values = np.zeros((16, 16))
+    values[3:6, 3:6] = -40.0
+    values[4, 4] = -90.0
+    values[10:14, 10:14] = -800.0
+    raster = raster_from(values, cell_size_m=100.0)
+    rows, columns = np.meshgrid(np.arange(16), np.arange(16), indexing="ij")
+    sunlight = np.ones((16, 16))
+    sunlight[3:6, 3:6] = 0.0
+    sunlight[10:14, 10:14] = 0.0
+    targets = shadow_targets(
+        raster,
+        start=(0, 0),
+        rows=rows,
+        columns=columns,
+        any_sunlight_fraction=sunlight,
+    )
+    assert (targets["nearest"].row, targets["nearest"].column) == (3, 3)
+    assert (targets["floor"].row, targets["floor"].column) == (4, 4)
+    assert targets["floor"].drop_m == pytest.approx(90.0)
+    assert targets["deepest"].drop_m == pytest.approx(800.0)
+    assert targets["floor"].region_area_km2 == pytest.approx(
+        targets["nearest"].region_area_km2
+    )
+
+
+def test_the_floor_is_the_nearest_cell_when_the_shadow_is_one_cell() -> None:
+    # A cold trap resolved as a single sampled cell has no interior, so its
+    # floor is its edge. That is true rather than degenerate, and it is what the
+    # real products do at a 250 m target sampling.
+    values = np.zeros((12, 12))
+    values[5, 5] = -20.0
+    raster = raster_from(values, cell_size_m=100.0)
+    rows, columns = np.meshgrid(np.arange(12), np.arange(12), indexing="ij")
+    sunlight = np.ones((12, 12))
+    sunlight[5, 5] = 0.0
+    targets = shadow_targets(
+        raster,
+        start=(0, 0),
+        rows=rows,
+        columns=columns,
+        any_sunlight_fraction=sunlight,
+    )
+    assert (targets["floor"].row, targets["floor"].column) == (
+        targets["nearest"].row,
+        targets["nearest"].column,
+    )

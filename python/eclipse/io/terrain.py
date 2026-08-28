@@ -48,6 +48,7 @@ __all__ = [
     "GeoRaster",
     "TerrainFileError",
     "TerrainProduct",
+    "centred_window",
     "latitude_of_radius",
     "latitudes_degrees",
     "load_terrain_manifest",
@@ -341,3 +342,24 @@ def latitudes_degrees(
             for r, c in zip(rows, columns)
         ]
     )
+
+
+def centred_window(raster: GeoRaster, *, span_m: float) -> tuple[int, int, int, int]:
+    """Row and column bounds of a square window centred on a raster.
+
+    Products in one collection are not one size -- these span 16 to 30 km --
+    and a distribution over one is not comparable to a distribution over
+    another. Cropping every one to the same centred span is what makes the
+    comparison a comparison, and it is separate from how far a horizon search
+    may look, which should still use every cell the product has.
+    """
+    height, width = raster.shape
+    span = min(int(round(span_m / raster.cell_size_m)), height, width)
+    if span < 2:
+        raise ValueError(
+            f"a {span_m:.6g} m window on a {raster.cell_size_m:.6g} m grid is "
+            f"{span} cells across, which is not a window"
+        )
+    first_row = (height - span) // 2
+    first_column = (width - span) // 2
+    return first_row, first_row + span, first_column, first_column + span
