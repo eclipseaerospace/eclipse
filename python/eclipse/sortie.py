@@ -134,6 +134,22 @@ def sample_transect(
         (end_row_column[0] - start_row_column[0]) / (samples - 1),
         (end_row_column[1] - start_row_column[1]) / (samples - 1),
     )
+    # Sampling finer than the grid is not extra resolution, it is a fabrication
+    # of one. Consecutive samples land on the same cell and report no rise,
+    # then a whole cell-to-cell rise is charged against a sub-cell run and the
+    # segment comes out far steeper than the ground is. Day 11 asked for four
+    # hundred samples across half a kilometre on a five metre grid and got two
+    # metre steps, which turned a thirty degree slope into a sixty-six degree
+    # cliff and closed a candidate region that was never closed.
+    if step < raster.cell_size_m:
+        raise ValueError(
+            f"{samples} samples across this line gives a {step:.3g} m step on a "
+            f"{raster.cell_size_m:.3g} m grid, which is finer than the grid "
+            "resolves. Consecutive samples would share cells and the slopes "
+            "would come out steeper than the terrain is; ask for at most "
+            f"{int(math.floor(max(abs(end_row_column[0] - start_row_column[0]), abs(end_row_column[1] - start_row_column[1])))) + 1} "
+            "samples"
+        )
     return Transect(
         distance_m=np.arange(samples, dtype=np.float64) * step,
         elevation_m=np.asarray(elevation, dtype=np.float64),

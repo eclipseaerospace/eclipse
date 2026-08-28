@@ -49,8 +49,10 @@ __all__ = [
     "TerrainFileError",
     "TerrainProduct",
     "latitude_of_radius",
+    "latitudes_degrees",
     "load_terrain_manifest",
     "model_to_latitude_longitude",
+    "north_azimuth_degrees",
     "point_scale_factor",
     "read_float_geotiff",
 ]
@@ -309,3 +311,33 @@ def load_terrain_manifest(path: Path | str) -> dict[str, TerrainProduct]:
     if not products:
         raise ValueError(f"{location} declares no terrain products")
     return products
+
+
+def north_azimuth_degrees(
+    raster: GeoRaster, rows: NDArray[np.int_], columns: NDArray[np.int_]
+) -> NDArray[np.float64]:
+    """Where lunar north lies, in the raster frame, at each sampled cell.
+
+    In a polar projection every meridian points a different way on the grid, so
+    this cannot be a constant. For a south-polar site north is away from the
+    pole, which is outward along the radius.
+    """
+    x = raster.origin_x_m + (columns.astype(np.float64) + 0.5) * raster.cell_size_m
+    y = raster.origin_y_m - (rows.astype(np.float64) + 0.5) * raster.cell_size_m
+    return np.asarray(np.degrees(np.arctan2(x, -y)) % 360.0)
+
+
+def latitudes_degrees(
+    raster: GeoRaster, rows: NDArray[np.int_], columns: NDArray[np.int_]
+) -> NDArray[np.float64]:
+    """Latitude of each sampled cell centre."""
+    return np.asarray(
+        [
+            model_to_latitude_longitude(
+                raster.origin_x_m + (float(c) + 0.5) * raster.cell_size_m,
+                raster.origin_y_m - (float(r) + 0.5) * raster.cell_size_m,
+                reference_radius_m=raster.reference_radius_m,
+            )[0]
+            for r, c in zip(rows, columns)
+        ]
+    )

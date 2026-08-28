@@ -62,6 +62,7 @@ __all__ = [
     "Illumination",
     "IlluminationSeries",
     "ShadowTarget",
+    "best_charge_point",
     "contiguous_interval_hours",
     "horizon_elevation_deg",
     "hour_angle_deg",
@@ -561,3 +562,33 @@ def shadow_targets(
         "largest": make("largest", (int(entry[0]), int(entry[1]))),
         "deepest": make("deepest", (int(deepest[0]), int(deepest[1]))),
     }
+
+
+def best_charge_point(
+    *,
+    rows: NDArray[np.int_],
+    columns: NDArray[np.int_],
+    any_sunlight_fraction: NDArray[np.float64],
+    elevation_m: NDArray[np.float64],
+) -> tuple[int, int]:
+    """The sampled cell that sees the most Sun, ties broken by elevation.
+
+    Not the highest cell. Height is a proxy for sunlight that holds on a rim
+    and fails on a crater floor, and a survey that picks the highest ground on
+    a crater floor picks somewhere arbitrary. Elevation only breaks ties, which
+    is where it is a genuine tiebreak: among equally lit ground, higher is
+    further from whatever fills the basin.
+
+    This is not a landing or trafficability assessment. It is a cell that sees
+    the most Sun, not a place anyone has said a lander could sit.
+    """
+    if not (rows.shape == columns.shape == any_sunlight_fraction.shape == elevation_m.shape):
+        raise ValueError(
+            "rows, columns, illumination and elevation must share a shape; got "
+            f"{rows.shape}, {columns.shape}, {any_sunlight_fraction.shape} and "
+            f"{elevation_m.shape}"
+        )
+    spread = max(float(np.ptp(elevation_m)), 1.0)
+    ranked = any_sunlight_fraction + 1e-9 * (elevation_m - elevation_m.min()) / spread
+    best = np.unravel_index(int(np.argmax(ranked)), ranked.shape)
+    return int(rows[best]), int(columns[best])

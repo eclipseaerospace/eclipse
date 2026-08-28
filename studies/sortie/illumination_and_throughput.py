@@ -135,7 +135,12 @@ from eclipse.illumination import (
 )
 from eclipse.io.platform import load_platform
 from eclipse.io.soil import janosi_hanamoto_model, load_soil, mohr_coulomb_model
-from eclipse.io.terrain import GeoRaster, model_to_latitude_longitude, read_float_geotiff
+from eclipse.io.terrain import (
+    GeoRaster,
+    latitudes_degrees,
+    north_azimuth_degrees,
+    read_float_geotiff,
+)
 from eclipse.platform import Platform
 from eclipse.sortie import (
     JOULES_PER_WATT_HOUR,
@@ -204,31 +209,6 @@ def caption(text: str, width: int = 148) -> str:
     )
 
 
-def north_azimuth_deg(raster: GeoRaster, rows: NDArray[np.int_], columns: NDArray[np.int_]) -> NDArray[np.float64]:
-    """Where lunar north lies, in the raster frame, at each point.
-
-    In a polar projection every meridian points a different way on the grid, so
-    this cannot be a constant. For a south-polar site north is away from the
-    pole, which is outward along the radius.
-    """
-    x = raster.origin_x_m + (columns.astype(np.float64) + 0.5) * raster.cell_size_m
-    y = raster.origin_y_m - (rows.astype(np.float64) + 0.5) * raster.cell_size_m
-    return np.asarray(np.degrees(np.arctan2(x, -y)) % 360.0)
-
-
-def latitudes(raster: GeoRaster, rows: NDArray[np.int_], columns: NDArray[np.int_]) -> NDArray[np.float64]:
-    return np.asarray(
-        [
-            model_to_latitude_longitude(
-                raster.origin_x_m + (float(c) + 0.5) * raster.cell_size_m,
-                raster.origin_y_m - (float(r) + 0.5) * raster.cell_size_m,
-                reference_radius_m=raster.reference_radius_m,
-            )[0]
-            for r, c in zip(rows, columns)
-        ]
-    )
-
-
 def illuminate(
     raster: GeoRaster, rows: NDArray[np.int_], columns: NDArray[np.int_]
 ) -> Illumination:
@@ -242,8 +222,8 @@ def illuminate(
     )
     return illumination_fraction(
         horizon=horizon,
-        latitude_deg=latitudes(raster, rows, columns),
-        north_azimuth_deg=north_azimuth_deg(raster, rows, columns),
+        latitude_deg=latitudes_degrees(raster, rows, columns),
+        north_azimuth_deg=north_azimuth_degrees(raster, rows, columns),
     )
 
 
@@ -357,8 +337,8 @@ def sweep_standoff(
         )
         fraction = illumination_fraction(
             horizon=horizon,
-            latitude_deg=latitudes(raster, rows, columns),
-            north_azimuth_deg=north_azimuth_deg(raster, rows, columns),
+            latitude_deg=latitudes_degrees(raster, rows, columns),
+            north_azimuth_deg=north_azimuth_degrees(raster, rows, columns),
         )
         swept.append(
             (

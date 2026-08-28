@@ -56,3 +56,11 @@ enable_error_code = [
   "truthy-iterable",
   "unimported-reveal",
 ]
+
+# SciPy ships no type information and there is no stub package in this
+# environment. The untyped surface is two calls in eclipse.planning, and both
+# are cast to a declared array type at the boundary so nothing downstream of
+# them is Any.
+[[tool.mypy.overrides]]
+module                 = ["scipy.*"]
+ignore_missing_imports = true

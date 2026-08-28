@@ -83,6 +83,7 @@ from eclipse.analysis.style import (
 from eclipse.illumination import (
     SUBSOLAR_LATITUDE_PERIOD_HOURS,
     ShadowTarget,
+    best_charge_point,
     horizon_elevation_deg,
     illumination_fraction,
     illumination_series,
@@ -93,8 +94,9 @@ from eclipse.io.site import AXIS_NAMES, Site, load_sites
 from eclipse.io.soil import janosi_hanamoto_model, load_soil, mohr_coulomb_model
 from eclipse.io.terrain import (
     GeoRaster,
+    latitudes_degrees,
     load_terrain_manifest,
-    model_to_latitude_longitude,
+    north_azimuth_degrees,
     read_float_geotiff,
 )
 from eclipse.platform import Platform
@@ -141,7 +143,14 @@ MAP_STRIDE: Final = 50
 HORIZON_AZIMUTHS: Final = 72
 HORIZON_SAMPLES: Final = 140
 HORIZON_STANDOFF_M: Final = 50.0
-ROUTE_SAMPLES: Final = 400
+# One sample per cell along the dominant axis, rather than a fixed count. A
+# fixed count is a step size that depends on how long the route happens to be,
+# and on a short route it goes finer than the grid: consecutive samples share a
+# cell, a whole cell-to-cell rise is charged against a sub-cell run, and the
+# slope comes out far steeper than the ground. That is what closed two
+# candidate regions on Day 11 -- 53 and 66 degree walls that are really 26 and
+# 30 -- and sample_transect now refuses the request outright.
+ROUTE_SAMPLE_STEP_CELLS: Final = 1
 ROUTE_ILLUMINATION_SPACING_M: Final = 40.0
 TIME_STEP_H: Final = 0.25
 DEPARTURE_STEP_H: Final = 4.0
@@ -180,29 +189,6 @@ def caption(text: str, width: int = 148) -> str:
     )
 
 
-def north_azimuth_deg(
-    raster: GeoRaster, rows: NDArray[np.int_], columns: NDArray[np.int_]
-) -> NDArray[np.float64]:
-    x = raster.origin_x_m + (columns.astype(np.float64) + 0.5) * raster.cell_size_m
-    y = raster.origin_y_m - (rows.astype(np.float64) + 0.5) * raster.cell_size_m
-    return np.asarray(np.degrees(np.arctan2(x, -y)) % 360.0)
-
-
-def latitudes(
-    raster: GeoRaster, rows: NDArray[np.int_], columns: NDArray[np.int_]
-) -> NDArray[np.float64]:
-    return np.asarray(
-        [
-            model_to_latitude_longitude(
-                raster.origin_x_m + (float(c) + 0.5) * raster.cell_size_m,
-                raster.origin_y_m - (float(r) + 0.5) * raster.cell_size_m,
-                reference_radius_m=raster.reference_radius_m,
-            )[0]
-            for r, c in zip(rows, columns)
-        ]
-    )
-
-
 def illuminate(
     raster: GeoRaster, rows: NDArray[np.int_], columns: NDArray[np.int_]
 ) -> Any:
@@ -215,8 +201,8 @@ def illuminate(
             samples_along_ray=HORIZON_SAMPLES,
             minimum_range_m=HORIZON_STANDOFF_M,
         ),
-        latitude_deg=latitudes(raster, rows, columns),
-        north_azimuth_deg=north_azimuth_deg(raster, rows, columns),
+        latitude_deg=latitudes_degrees(raster, rows, columns),
+        north_azimuth_deg=north_azimuth_degrees(raster, rows, columns),
     )
 
 
@@ -391,14 +377,13 @@ def survey_site(
     grid = illuminate(raster, grid_rows.ravel(), grid_columns.ravel())
     lit = grid.any_sunlight_fraction.reshape(grid_rows.shape)
 
-    # Best illuminated, ties broken by elevation. A crater floor has plenty of
-    # highest cells and none of them are a charge point.
     elevation = raster.values[grid_rows, grid_columns]
-    ranked = lit + 1e-9 * (elevation - elevation.min()) / max(
-        float(np.ptp(elevation)), 1.0
+    charge_index = best_charge_point(
+        rows=grid_rows,
+        columns=grid_columns,
+        any_sunlight_fraction=lit,
+        elevation_m=elevation,
     )
-    charge = np.unravel_index(int(np.argmax(ranked)), lit.shape)
-    charge_index = (int(grid_rows[charge]), int(grid_columns[charge]))
     highest = np.unravel_index(int(np.argmax(elevation)), lit.shape)
 
     latitude, longitude = raster.center_latitude_longitude()
@@ -422,8 +407,14 @@ def survey_site(
         traction_fraction=traction,
         charge_row=charge_index[0],
         charge_column=charge_index[1],
-        charge_lit_fraction=float(lit[charge]),
-        charge_is_highest=bool(charge == highest),
+        charge_lit_fraction=float(
+            lit[
+                (grid_rows == charge_index[0]) & (grid_columns == charge_index[1])
+            ][0]
+        ),
+        charge_is_highest=bool(
+            (int(grid_rows[highest]), int(grid_columns[highest])) == charge_index
+        ),
         shadow_fraction_of_window=shadow_fraction,
     )
 
@@ -472,11 +463,13 @@ def price_sortie(
     charge: tuple[int, int],
     target: ShadowTarget,
 ) -> Sortie:
+    span = max(abs(target.row - charge[0]), abs(target.column - charge[1]))
+    samples = max(span // ROUTE_SAMPLE_STEP_CELLS + 1, 2)
     transect = sample_transect(
         raster,
         start_row_column=charge,
         end_row_column=(target.row, target.column),
-        samples=ROUTE_SAMPLES,
+        samples=samples,
     )
     flat_slip, _ = within_stride_slip_ratio(
         platform=platform,
@@ -497,12 +490,12 @@ def price_sortie(
     )
     locomotion = trip.total_J / JOULES_PER_WATT_HOUR * NOMINAL_DERATING
 
-    rows = np.rint(np.linspace(charge[0], target.row, ROUTE_SAMPLES)).astype(int)
-    columns = np.rint(np.linspace(charge[1], target.column, ROUTE_SAMPLES)).astype(int)
-    spacing = float(transect.distance_m[-1]) / (ROUTE_SAMPLES - 1)
+    rows = np.rint(np.linspace(charge[0], target.row, samples)).astype(int)
+    columns = np.rint(np.linspace(charge[1], target.column, samples)).astype(int)
+    spacing = float(transect.distance_m[-1]) / (samples - 1)
     stride = max(1, int(round(ROUTE_ILLUMINATION_SPACING_M / spacing)))
     index = np.unique(
-        np.concatenate([np.arange(0, ROUTE_SAMPLES, stride), [ROUTE_SAMPLES - 1]])
+        np.concatenate([np.arange(0, samples, stride), [samples - 1]])
     )
 
     walking = float(transect.distance_m[-1]) / platform.nominal_speed_m_per_s / 3600.0
@@ -517,8 +510,8 @@ def price_sortie(
             samples_along_ray=HORIZON_SAMPLES,
             minimum_range_m=HORIZON_STANDOFF_M,
         ),
-        latitude_deg=latitudes(raster, rows[index], columns[index]),
-        north_azimuth_deg=north_azimuth_deg(raster, rows[index], columns[index]),
+        latitude_deg=latitudes_degrees(raster, rows[index], columns[index]),
+        north_azimuth_deg=north_azimuth_degrees(raster, rows[index], columns[index]),
         hours=hours,
     )
     dark = shadowed_hours(
