@@ -337,3 +337,35 @@ def test_a_home_outside_the_grid_is_refused() -> None:
             home=(9, 0),
             cost=flat_cost(),
         )
+
+
+def test_a_unit_cost_makes_the_round_trip_exactly_twice_the_one_way() -> None:
+    # A metre costs a metre in either direction, so a field over a unit cost is
+    # symmetric and the crew's traverse range can be read off it by halving.
+    # The energy field is not symmetric and halving it would be wrong; this is
+    # the property that makes one of the two safe to halve and not the other.
+    rows, columns = np.meshgrid(np.arange(25), np.arange(25), indexing="ij")
+    values = 20.0 * columns + 8.0 * np.sin(rows / 2.0)
+    unit = flat_cost(limit_deg=60.0)
+    field = round_trip_energy_J(
+        elevation_m=values, cell_size_m=10.0, home=(12, 0), cost=unit
+    )
+    out = plan_route(
+        elevation_m=values, cell_size_m=10.0, start=(12, 0), goal=(12, 24), cost=unit
+    )
+    back = plan_route(
+        elevation_m=values, cell_size_m=10.0, start=(12, 24), goal=(12, 0), cost=unit
+    )
+    assert out.route is not None and back.route is not None
+    assert out.route.total_energy_J == pytest.approx(back.route.total_energy_J)
+    assert field[12, 24] == pytest.approx(2.0 * out.route.total_energy_J)
+
+    dear = climbing_cost(limit_deg=60.0)
+    asymmetric = round_trip_energy_J(
+        elevation_m=values, cell_size_m=10.0, home=(12, 0), cost=dear
+    )
+    up = plan_route(
+        elevation_m=values, cell_size_m=10.0, start=(12, 0), goal=(12, 24), cost=dear
+    )
+    assert up.route is not None
+    assert asymmetric[12, 24] != pytest.approx(2.0 * up.route.total_energy_J)
