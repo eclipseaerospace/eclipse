@@ -35,10 +35,16 @@
 # whatever the transmitter is standing on. Line of sight into a crater comes
 # from above it, not from beside it.
 #
-# So the answer is an autonomy requirement rather than a relay requirement, and
-# it has a duration attached: the platform must work out of contact for the
-# length of a dwell plus an approach, and that is the number a design would be
-# built against.
+# So the answer is an autonomy requirement rather than a surface-relay
+# requirement, and it has a duration attached: the platform must work out of
+# contact for the length of a dwell plus an approach, and that is the number a
+# design would be built against.
+#
+# Only a surface mast is modelled, and the distinction matters. The planned
+# architecture is orbital -- Lunar Pathfinder, Moonlight, LunaNet -- and a
+# satellite sees into a shadowed crater from above at elevations no rim mast can
+# reach. That reshapes the requirement rather than removing it: unattended
+# between passes rather than unattended in a hole. Nothing here models a pass.
 #
 # This is geometry, not a link budget. Whether a visible platform can close a
 # link at a useful data rate is a question about antennas and power and is not
@@ -1293,6 +1299,22 @@ def boundary_rows(
                 "not: a boulder or a metre-scale rise below the grid blocks a "
                 "sightline without moving the total, on a product the producers "
                 "state is about nine tenths interpolated at 5 m"
+            ),
+        ),
+        BoundaryRow(
+            quantity="orbital relay",
+            published_range="Lunar Pathfinder, Moonlight, LunaNet, all planned",
+            used="absent; only a surface mast at the charge point is modelled",
+            status=OUTSIDE,
+            basis=(
+                "the relay tested here stands on the rim, and a rim cannot see "
+                "into a hole. A satellite looks down into a permanently shadowed "
+                "region at elevations no mast reaches, so the blind fractions "
+                "above are the surface-only case and must not be read as the "
+                "mission's. What an orbiter changes is the shape of the autonomy "
+                "requirement rather than its existence: work unattended between "
+                "passes instead of permanently in shadow. Pass geometry, "
+                "constellation size and link budget are all absent here"
             ),
         ),
         BoundaryRow(

@@ -1,0 +1,267 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# studies.sites.morphology — crew, wheel and leg over the same ground.
+#
+# Generated. Do not edit by hand.
+
+schema_version = 1
+study = "morphology"
+battery_Wh = 400.0
+survival_W = 11.8
+dwell_hours = 4.0
+derating = 4.0
+soil = "lunar-intercrater/carrier1991"
+
+[totals]
+sites = 10
+wheeled_area_km2 = 864.375175
+legged_area_km2 = 688.5196000000001
+crew_area_km2 = 83.3725
+wheeled_cold_trap_km2 = 17.037225
+legged_cold_trap_km2 = 14.260125
+crew_cold_trap_km2 = 0.653775
+wheel_over_leg_cold_trap = 1.1947458384831828
+sites_where_wheel_reaches_more = 7
+
+[limits]
+legged_deg = 39.8000000000028
+wheeled_deg = 26.500000000003553
+
+[[region]]
+id = "connecting-ridge"
+name = "Connecting Ridge"
+candidate = false
+wheeled_km2 = 134.29335
+legged_km2 = 111.45580000000001
+crew_km2 = 10.958225
+wheeled_cold_trap_km2 = 4.54035
+legged_cold_trap_km2 = 3.8030250000000003
+crew_cold_trap_km2 = 0.13
+leg_only_km2 = 4.55345
+wheel_only_km2 = 27.391000000000002
+
+[[region]]
+id = "haworth"
+name = "Haworth"
+candidate = true
+wheeled_km2 = 100.56835000000001
+legged_km2 = 66.277925
+crew_km2 = 8.340775
+wheeled_cold_trap_km2 = 1.423975
+legged_cold_trap_km2 = 0.7295
+crew_cold_trap_km2 = 0.148325
+leg_only_km2 = 0.9915750000000001
+wheel_only_km2 = 35.282000000000004
+
+[[region]]
+id = "malapert-massif"
+name = "Malapert Massif"
+candidate = true
+wheeled_km2 = 63.378875
+legged_km2 = 62.96285
+crew_km2 = 9.700650000000001
+wheeled_cold_trap_km2 = 0.19
+legged_cold_trap_km2 = 0.14
+crew_cold_trap_km2 = 0.01
+leg_only_km2 = 11.069375
+wheel_only_km2 = 11.4854
+
+[[region]]
+id = "mons-mouton-plateau"
+name = "Mons Mouton Plateau"
+candidate = true
+wheeled_km2 = 44.9632
+legged_km2 = 28.717725
+crew_km2 = 2.809975
+wheeled_cold_trap_km2 = 0.6277
+legged_cold_trap_km2 = 0.42000000000000004
+crew_cold_trap_km2 = 0.02
+leg_only_km2 = 0.0001
+wheel_only_km2 = 16.245575000000002
+
+[[region]]
+id = "nobile-rim-1"
+name = "Nobile Rim 1"
+candidate = true
+wheeled_km2 = 83.823175
+legged_km2 = 92.828625
+crew_km2 = 10.555850000000001
+wheeled_cold_trap_km2 = 0.965275
+legged_cold_trap_km2 = 1.570275
+crew_cold_trap_km2 = 0.07495
+leg_only_km2 = 13.456675
+wheel_only_km2 = 4.451225
+
+[[region]]
+id = "nobile-rim-2"
+name = "Nobile Rim 2"
+candidate = true
+wheeled_km2 = 104.27617500000001
+legged_km2 = 75.52925
+crew_km2 = 10.464325
+wheeled_cold_trap_km2 = 0.08
+legged_cold_trap_km2 = 0.060000000000000005
+crew_cold_trap_km2 = 0.0
+leg_only_km2 = 0.0023
+wheel_only_km2 = 28.749225000000003
+
+[[region]]
+id = "peak-near-shackleton"
+name = "Peak near Shackleton"
+candidate = false
+wheeled_km2 = 45.823575000000005
+legged_km2 = 28.764950000000002
+crew_km2 = 2.814625
+wheeled_cold_trap_km2 = 0.28195000000000003
+legged_cold_trap_km2 = 0.12000000000000001
+crew_cold_trap_km2 = 0.0
+leg_only_km2 = 0.0
+wheel_only_km2 = 17.058625
+
+[[region]]
+id = "shackleton-rim"
+name = "Shackleton Rim"
+candidate = false
+wheeled_km2 = 56.3915
+legged_km2 = 46.348400000000005
+crew_km2 = 5.55555
+wheeled_cold_trap_km2 = 3.0826000000000002
+legged_cold_trap_km2 = 3.2537000000000003
+crew_cold_trap_km2 = 0.08
+leg_only_km2 = 1.1149
+wheel_only_km2 = 11.158000000000001
+
+[[region]]
+id = "shoemaker"
+name = "Shoemaker"
+candidate = false
+wheeled_km2 = 165.89715
+legged_km2 = 112.97435
+crew_km2 = 11.221375
+wheeled_cold_trap_km2 = 4.7354
+legged_cold_trap_km2 = 3.043625
+crew_cold_trap_km2 = 0.0805
+leg_only_km2 = 0.00015000000000000001
+wheel_only_km2 = 52.92295
+
+[[region]]
+id = "de-gerlache-rim-2"
+name = "de Gerlache Rim 2"
+candidate = true
+wheeled_km2 = 64.95982500000001
+legged_km2 = 62.659725
+crew_km2 = 10.95115
+wheeled_cold_trap_km2 = 1.1099750000000002
+legged_cold_trap_km2 = 1.12
+crew_cold_trap_km2 = 0.11
+leg_only_km2 = 2.0511
+wheel_only_km2 = 4.3512
+
+[[boundary_row]]
+quantity = "interface"
+published_range = "not applicable"
+used = "one new cost table; the planner is unchanged"
+status = "inside_published_range"
+basis = "adding a genuinely different contact regime required no change to eclipse.planning, eclipse.mobility, eclipse.sortie or the reachable-set composition. It required one new physics module and one new loader function, because the platform file format assumes feet. That is where the seam leaked and it is the cheapest place for it to"
+
+[[boundary_row]]
+quantity = "reliability"
+published_range = "none, and it is the wheel's strongest argument"
+used = "absent for both actors"
+status = "no_published_range"
+basis = "twelve or more actuators against four to six, in abrasive cryogenic dust, with no redundancy, no dust ingress and no duty-cycle life modelled. It runs the same direction as this result, which means the result is if anything generous to legs"
+
+[[boundary_row]]
+quantity = "obstacles"
+published_range = "none at 5 m posting"
+used = "absent; every cell is smooth"
+status = "outside_published_range"
+basis = "a boulder above wheel diameter stops a rover and a legged platform steps over it. That is the mechanism by which legs win and there is no dataset at the scale that would show it, so this comparison is run on ground smoother than either machine would meet. It is the single largest reason the answer here could be wrong"
+
+[[boundary_row]]
+quantity = "pits and lava tubes"
+published_range = "no polar pit in any archive"
+used = "absent"
+status = "outside_published_range"
+basis = "Day 13 established there is no catalogued polar pit and that the median catalogued pit is 16 m across, three cells at 5 m. The canonical legged case is untestable with existing data rather than tested and failed"
+
+[[boundary_row]]
+quantity = "slope past repose"
+published_range = "not encountered on these routes"
+used = "not tested"
+status = "outside_published_range"
+basis = "legs are supposed to win at or beyond the angle of repose, and no route to a cold trap in these ten windows needs more than the 15 degrees Day 13 measured. Crater interiors and non-candidate sites are where that case would be made"
+
+[[boundary_row]]
+quantity = "grousers"
+published_range = "standard on every flown lunar wheel"
+used = "none; a smooth rigid wheel"
+status = "outside_published_range"
+basis = "omitting them understates the rover's traction and slope limit, so the wheel's margin here is a floor"
+
+[[boundary_row]]
+quantity = "steering"
+published_range = "none"
+used = "absent; straight-line cost integrated along a turning path"
+status = "no_published_range"
+basis = "skid steering on four wheels is expensive and a legged platform turns nearly free. The search turns constantly and neither actor is charged for it, which favours the rover"
+
+[[boundary_row]]
+quantity = "charge point"
+published_range = "not applicable"
+used = "the same point for all three actors"
+status = "outside_published_range"
+basis = "chosen for illumination without reference to morphology, and the crew would not have one at all. It flatters the crew, whose numbers are therefore an upper bound on an actor that is already far behind"
+
+[[boundary_row]]
+quantity = "hardware"
+published_range = "none"
+used = "none; neither platform exists"
+status = "no_published_range"
+basis = "two assumed bodies, one soil, no machine. Nothing in this comparison has been measured"
+
+
+[summary]
+text = """
+Does the legged case close on the terrain that has been mapped. No.
+
+Across ten sites from the same charge point at 400 Wh, the rover reaches
+17.04 km² of permanently shadowed ground against the quadruped's 14.26 and
+a suited crew's 0.65. It reaches more cold trap at 7 of the ten. On total
+ground the margin is wider still: 864 km² against 689.
+
+The mechanism is a crossover at eight degrees and the fact that polar
+terrain is mostly below it. A wheel pays no swing work, which is the
+largest term in the legged budget at lunar gravity, and it pays compaction
+as a rolling resistance instead. On gentle ground the trade is strongly in
+its favour. Above the crossover it reverses hard, and past 26.6 degrees
+the rover cannot hold the slope at all while the quadruped continues to
+39.8 — but Day 13 already established that no route to a cold trap in
+these windows needs more than 15 degrees. The legged advantage is real and
+it is on ground these errands do not cross.
+
+The irony is worth recording. Bekker built this model for vehicle
+mobility, and every plate-sinkage campaign this repository has transcribed
+— KLS-1, GRC-1 — was run to characterise wheels. Fifteen days of
+terramechanics calibrated from wheel literature and applied to feet, and
+the wheel is what the same data supports.
+
+What the result is not: an answer about legged robotics, or about any
+terrain that has not been mapped at 5 m. Every clause in the claim is
+doing work. There are no obstacles in this comparison, and a boulder above
+wheel diameter stops a rover where a legged platform steps over it — that
+is the mechanism by which legs win and there is no dataset at the scale
+that would show it. There is no pit, because no archive holds a polar one.
+There is no slope past the angle of repose, because these routes do not
+meet it.
+
+And the strongest argument on the table runs the same way as the result
+rather than against it. Twelve or more actuators in abrasive cryogenic
+dust against four to six is why every funded programme is wheeled, and
+nothing here models it. A comparison that omits reliability and still
+finds for the wheel is not one that reliability would rescue.
+"""
+
+[boundary]
+tally = "Of 9 quantities, 1 sit inside a published range, 5 outside one, and 3 have no published range at all."
+

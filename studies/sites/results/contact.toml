@@ -335,7 +335,7 @@ hardware anywhere. Every number in fifteen days is a ceiling, and that
 list is the specification of what would turn them into floors.
 """
 
-# Of 9 quantities, 3 sit inside a published range, 3 outside one, and 3 have no published range at all.
+# Of 10 quantities, 3 sit inside a published range, 4 outside one, and 3 have no published range at all.
 
 [[boundary_row]]
 quantity = "Earth visibility"
@@ -350,6 +350,13 @@ published_range = "not applicable"
 used = "a viewshed from the charge point, aggregate area only"
 status = "outside_published_range"
 basis = "the area moves 1.07 times across an eightfold coarsening and 1.08 times when the viewshed's own binning is refined, so the aggregate is stable enough to report. Whether any particular link closes is not: a boulder or a metre-scale rise below the grid blocks a sightline without moving the total, on a product the producers state is about nine tenths interpolated at 5 m"
+
+[[boundary_row]]
+quantity = "orbital relay"
+published_range = "Lunar Pathfinder, Moonlight, LunaNet, all planned"
+used = "absent; only a surface mast at the charge point is modelled"
+status = "outside_published_range"
+basis = "the relay tested here stands on the rim, and a rim cannot see into a hole. A satellite looks down into a permanently shadowed region at elevations no mast reaches, so the blind fractions above are the surface-only case and must not be read as the mission's. What an orbiter changes is the shape of the autonomy requirement rather than its existence: work unattended between passes instead of permanently in shadow. Pass geometry, constellation size and link budget are all absent here"
 
 [[boundary_row]]
 quantity = "libration model"

@@ -12,9 +12,19 @@
 # would dress a set of invented numbers in the apparatus of measured ones, and
 # that apparatus is the only reason to trust a soil file.
 #
-# Keys under [platform.parameters] are passed straight to the Platform
+# Keys under [platform.parameters] are passed straight to the platform
 # constructor. A renamed or misspelled parameter therefore fails at
 # construction rather than being silently dropped.
+#
+# There are two loaders rather than one, and that is a finding rather than a
+# convenience. Day 16 added a wheeled platform and this module is the only place
+# in the stack that had to change to accept it: load_platform demands a
+# footprint, because a legged platform is defined by where its feet are, and a
+# rover has no such thing. The cost layer, the planner and the reachable-set
+# composition all took the new platform unchanged. So the seam holds where the
+# architecture claims it does -- in the physics and the mission layer -- and
+# leaks exactly here, at the file format, which is the cheapest place for it to
+# leak and the easiest to fix if a third morphology ever makes it worth doing.
 
 from __future__ import annotations
 
@@ -24,8 +34,15 @@ from pathlib import Path
 from typing import Any, Final
 
 from eclipse.platform import FootPosition, Platform
+from eclipse.rolling import WheeledPlatform
 
-__all__ = ["PlatformDefinition", "PlatformFileError", "load_platform"]
+__all__ = [
+    "PlatformDefinition",
+    "PlatformFileError",
+    "WheeledPlatformDefinition",
+    "load_platform",
+    "load_wheeled_platform",
+]
 
 SUPPORTED_SCHEMA_VERSION: Final = 1
 
@@ -46,14 +63,25 @@ class PlatformDefinition:
     source_path: Path
 
 
+@dataclass(frozen=True, slots=True)
+class WheeledPlatformDefinition:
+    schema_version: int
+    id: str
+    name: str
+    morphology: str
+    basis: str
+    status: str
+    platform: WheeledPlatform
+    source_path: Path
+
+
 def _require(table: dict[str, Any], key: str, context: str) -> Any:
     if key not in table:
         raise PlatformFileError(f"{context}: missing required key {key!r}")
     return table[key]
 
 
-def load_platform(path: Path | str) -> PlatformDefinition:
-    source_path = Path(path)
+def _read(source_path: Path) -> tuple[dict[str, Any], int, dict[str, Any], Any]:
     try:
         table = tomllib.loads(source_path.read_text(encoding="utf-8"))
     except tomllib.TOMLDecodeError as error:
@@ -68,6 +96,12 @@ def load_platform(path: Path | str) -> PlatformDefinition:
 
     definition = _require(table, "platform", str(source_path))
     parameters = _require(definition, "parameters", f"{source_path} [platform]")
+    return table, version, definition, parameters
+
+
+def load_platform(path: Path | str) -> PlatformDefinition:
+    source_path = Path(path)
+    table, version, definition, parameters = _read(source_path)
 
     values = dict(parameters)
     footprint = values.pop("footprint", None)
@@ -93,6 +127,45 @@ def load_platform(path: Path | str) -> PlatformDefinition:
         ) from error
 
     return PlatformDefinition(
+        schema_version=version,
+        id=_require(table, "id", str(source_path)),
+        name=_require(definition, "name", f"{source_path} [platform]"),
+        morphology=_require(definition, "morphology", f"{source_path} [platform]"),
+        basis=_require(definition, "basis", f"{source_path} [platform]"),
+        status=_require(definition, "status", f"{source_path} [platform]"),
+        platform=platform,
+        source_path=source_path,
+    )
+
+
+def load_wheeled_platform(path: Path | str) -> WheeledPlatformDefinition:
+    """Load a rover definition.
+
+    Separate from load_platform rather than a branch inside it, because the two
+    constructors take genuinely different things and a union return type would
+    push the morphology test onto every caller. A study knows which platform it
+    is asking for.
+    """
+    source_path = Path(path)
+    table, version, definition, parameters = _read(source_path)
+
+    values = dict(parameters)
+    if "footprint" in values:
+        raise PlatformFileError(
+            f"{source_path}: [platform.parameters] declares a footprint, which "
+            "belongs to a legged platform; a rover is described by a wheelbase "
+            "and a track. Load this file with load_platform instead"
+        )
+
+    try:
+        platform = WheeledPlatform(**values)
+    except TypeError as error:
+        raise PlatformFileError(
+            f"{source_path}: [platform.parameters] does not match the "
+            f"WheeledPlatform constructor: {error}"
+        ) from error
+
+    return WheeledPlatformDefinition(
         schema_version=version,
         id=_require(table, "id", str(source_path)),
         name=_require(definition, "name", f"{source_path} [platform]"),

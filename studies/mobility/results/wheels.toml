@@ -1,0 +1,230 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# studies.mobility.wheels — the wheel against the leg on one soil.
+#
+# Generated. Do not edit by hand.
+
+schema_version = 1
+study = "wheels"
+gravity_m_per_s2 = 1.62
+soil = "lunar-intercrater/carrier1991"
+
+[platforms]
+legged = "nominal-quadruped"
+wheeled = "nominal-rover"
+mass_kg = 50.0
+matched = "mass and tipping limit, so the comparison is locomotion"
+
+[level_ground]
+legged_J_per_m = 18.910387422126863
+wheeled_J_per_m = 12.311028997473272
+wheel_advantage = 1.5360525449178983
+legged_swing_J_per_m = 16.189269714269795
+wheeled_compaction_J_per_m = 10.871590561796962
+legged_slip_ratio = 0.04679850159269238
+wheeled_slip_ratio = 0.11692267445489257
+
+[crossover]
+slope_deg = 8.032273302944208
+exists = true
+meaning = "below it the wheel is cheaper, above it the leg is"
+
+[limits]
+legged_traction_deg = 43.545928803868314
+legged_tipping_deg = 39.8055710922652
+legged_binding = "tipping"
+wheeled_traction_deg = 26.57410589623764
+wheeled_tipping_deg = 39.8055710922652
+wheeled_binding = "traction"
+
+# Cost per metre at slopes both platforms can hold.
+[[sample]]
+slope_deg = 0.0
+legged_J_per_m = 18.910387422126863
+wheeled_J_per_m = 12.311028997473272
+legged_slip_ratio = 0.04679850159269238
+wheeled_slip_ratio = 0.11692267445489257
+
+[[sample]]
+slope_deg = 5.0
+legged_J_per_m = 25.953984134454124
+wheeled_J_per_m = 22.545591606112524
+legged_slip_ratio = 0.04679850159269238
+wheeled_slip_ratio = 0.2071141236674648
+
+[[sample]]
+slope_deg = 10.0
+legged_J_per_m = 32.91220788115059
+wheeled_J_per_m = 36.04943496187455
+legged_slip_ratio = 0.04679850159269238
+wheeled_slip_ratio = 0.3143461483597847
+
+[[sample]]
+slope_deg = 15.0
+legged_J_per_m = 39.7329040520186
+wheeled_J_per_m = 56.75951988082148
+legged_slip_ratio = 0.04679850159269238
+wheeled_slip_ratio = 0.44776067174930545
+
+[[sample]]
+slope_deg = 20.0
+legged_J_per_m = 46.365472061443896
+wheeled_J_per_m = 100.19135572801909
+legged_slip_ratio = 0.04679850159269238
+wheeled_slip_ratio = 0.6236207557381079
+
+[[sample]]
+slope_deg = 25.0
+legged_J_per_m = 52.76121067517046
+wheeled_J_per_m = 349.89628864096835
+legged_slip_ratio = 0.04679850159269238
+wheeled_slip_ratio = 0.8749137183800975
+
+# Does a bigger wheel overturn the result.
+[[diameter]]
+diameter_m = 0.2
+level_J_per_m = 14.840727269561416
+traction_limit_deg = 24.324634320444225
+crossover_deg = 4.7868769648299665
+
+[[diameter]]
+diameter_m = 0.25
+level_J_per_m = 12.311028997473272
+traction_limit_deg = 26.57410589623764
+crossover_deg = 8.032273302944208
+
+[[diameter]]
+diameter_m = 0.35
+level_J_per_m = 9.44951703547564
+traction_limit_deg = 29.61346383091277
+crossover_deg = 12.12541466901577
+
+[[diameter]]
+diameter_m = 0.5
+level_J_per_m = 7.244639669619206
+traction_limit_deg = 32.47205084475685
+crossover_deg = 15.762975835827694
+
+[[diameter]]
+diameter_m = 0.75
+level_J_per_m = 5.417219407879975
+traction_limit_deg = 35.38432449490121
+crossover_deg = 19.32601157894568
+
+[[boundary_row]]
+quantity = "compaction resistance"
+published_range = "Bekker rigid-wheel form, Wong (2008) ch. 2"
+used = "pressure integrated through depth over the rut width"
+status = "inside_published_range"
+basis = "the integral form and Wong's closed form are independent routes to the same number and agree to machine precision across four sinkage exponents, three loads and three wheel geometries"
+
+[[boundary_row]]
+quantity = "reliability"
+published_range = "none, and this is the wheel's strongest argument"
+used = "absent entirely"
+status = "no_published_range"
+basis = "twelve or more actuators in abrasive cryogenic dust against four to six, with no redundancy analysis, no dust ingress model, no duty-cycle life and no failure modes on either platform. Nothing in this repository models it, and it sits beside a slope result that favours legs. A reader who weighted it would be right to"
+
+[[boundary_row]]
+quantity = "obstacles"
+published_range = "none at 5 m posting"
+used = "absent; both platforms cross a smooth surface"
+status = "outside_published_range"
+basis = "a boulder above wheel diameter stops a rover and a legged platform steps over it, which is the mechanism by which legs are supposed to win. There is no boulder statistic at the scale that would show it, so the comparison here is run on ground smoother than either machine would meet"
+
+[[boundary_row]]
+quantity = "grousers"
+published_range = "standard on every flown lunar wheel"
+used = "none; a smooth rigid wheel"
+status = "outside_published_range"
+basis = "grousers raise developed thrust substantially and are the first thing a real lunar wheel has. Omitting them understates the rover's slope limit, so the traction limit reported here is a floor rather than an estimate"
+
+[[boundary_row]]
+quantity = "wheel diameter"
+published_range = "0.25 m assumed; 0.20 to 0.75 m swept"
+used = "0.25 m on a 50 kg platform"
+status = "no_published_range"
+basis = "the single most consequential rover parameter, because diameter sets contact length and contact length sets how much shear any slip can mobilise. Swept because a reader is entitled to ask whether a bigger wheel overturns the result"
+
+[[boundary_row]]
+quantity = "rigid wheel"
+published_range = "Bekker's form assumes it"
+used = "rigid, no deflection"
+status = "outside_published_range"
+basis = "a compliant or mesh wheel lengthens the contact patch at the same load, which is precisely the quantity the rover is short of here. This is the assumption most likely to be understating the wheel and it is not swept"
+
+[[boundary_row]]
+quantity = "steering and turning"
+published_range = "none"
+used = "absent; straight-line cost only"
+status = "no_published_range"
+basis = "skid steering on a four-wheeled rover is expensive and a legged platform turns nearly free. Neither is modelled, and the reachable-set search that consumes this curve turns constantly"
+
+[[boundary_row]]
+quantity = "crossover slope"
+published_range = "not applicable"
+used = "8.03 degrees"
+status = "outside_published_range"
+basis = "an equality between two assumed platforms on one soil, so it carries every assumption in both files. It is reported because its existence is the finding, not because its value is precise"
+
+[[boundary_row]]
+quantity = "hardware"
+published_range = "none"
+used = "none; neither platform exists"
+status = "no_published_range"
+basis = "no wheel has been rolled, no foot has been placed, and no result here has been compared against a machine"
+
+
+[summary]
+text = """
+On mapped polar terrain at 5 m posting, with no obstacles, the wheeled
+platform is the cheaper machine on most of the ground and the legged one
+is the only machine on the rest. Those are not the same claim and the
+study exists to keep them apart.
+
+On level ground the rover costs 12.3 J/m against the quadruped's 18.9, an
+advantage of 1.54 times, and the reason is a term rather than a
+refinement: swing work is 86% of what the leg spends standing still and
+moving, and a wheel does not pay it. That is the wheel's whole case and it
+is a strong one.
+
+The case ends at 8.0 degrees. Above it the wheel is more expensive and the
+gap widens fast, because the resistance it must overcome is divided by one
+minus its slip and its slip is climbing: 62% at twenty degrees against the
+foot's 5%. At 26.6 degrees the rover stops entirely, on traction, and the
+quadruped continues to 39.8 where it stops by tipping over.
+
+The mechanism behind that is worth stating precisely because it is not the
+one intuition offers. It is not that the wheel is short of friction. It is
+that shear under a wheel builds from zero at the entry of the contact
+patch to its maximum at the bottom, so the mobilised fraction is an
+average over the patch. On a 0.25 m wheel in this regolith the patch is 45
+mm long against a shear deformation modulus of 18 mm, and even at the slip
+ceiling only about two thirds of the available shear is developed. The
+rover cannot reach its own traction limit at any slip. This is why rover
+operational slope limits sit well below their static ones, and it is the
+same physics that stopped Spirit.
+
+A bigger wheel is the obvious answer and it helps without rescuing: over
+0.20 to 0.75 m the level cost falls by 2.74 times and the traction limit
+rises from 24.3 to 35.4 degrees, still short of the quadruped's 39.8. A
+0.75 m wheel on a 50 kg vehicle is also not a rover.
+
+What would have to be true for the legged case to close is now a
+specification rather than a hope, and none of it is in this repository:
+boulder statistics at metre scale, which is the mechanism by which legs
+actually win and the fifth time this project has asked for the same
+measurement; a polar pit, when no archive holds one and the median
+catalogued pit is three cells across at 5 m; and slope past the angle of
+repose, which does not occur on the routes these errands need.
+
+And the argument that runs the other way is the strongest one on the
+table. Twelve or more actuators in abrasive cryogenic dust against four to
+six is why every funded programme is wheeled, and nothing here models it.
+A slope result that favours legs is worth very little beside it, and
+saying so is not modesty but the condition for the rest being believed.
+"""
+
+[boundary]
+tally = "Of 9 quantities, 1 sit inside a published range, 4 outside one, and 4 have no published range at all."
+

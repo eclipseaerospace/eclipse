@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# A nominal four-wheeled rover — the competitor, not a design.
+#
+# Every funded lunar surface-mobility programme is wheeled. VIPER is wheeled,
+# the Lunar Terrain Vehicle is wheeled, every Mars rover that has driven is
+# wheeled, and no space agency has committed a legged machine to flight. For
+# fifteen days this project measured its case against a suited human, which is
+# not what anyone is proposing to send. This file exists so the comparison can
+# be run against the thing that would actually be built instead.
+#
+# Nothing here is a rover that exists, in exactly the sense that the nominal
+# quadruped is not a robot. Every number is assumed. What the file buys is that
+# the assumptions are named, in one place, and swappable.
+#
+# The geometry is chosen to match the quadruped's support polygon rather than to
+# be a good rover. A 0.50 m wheelbase against a 0.30 m centre-of-mass height
+# gives the same 39.8 degree tipping limit as the quadruped's feet at x = 0.25,
+# so the two platforms tip at the identical slope and the comparison isolates
+# locomotion rather than rewarding whichever body was drawn wider. A real rover
+# would be lower and wider and would tip later; that is a genuine wheeled
+# advantage and it is being given away here on purpose.
+#
+# Mass matches the quadruped exactly at 50.0 kg total, wheel for leg, so the
+# soil sees the same weight on the same ground.
+#
+# Wheel size is the parameter that matters most and it is the least defensible.
+# Diameter sets the contact patch length, which sets how much of the soil's
+# shear strength any amount of slip can actually mobilise, and 0.25 m is small.
+# Larger is better on every axis here: at 0.50 m the compaction resistance
+# halves and the slip limit rises by six degrees. It is set small because the
+# platform is 50 kg and a half-metre wheel on a 50 kg vehicle is not a rover,
+# it is a pair of wheels with a battery between them. That trade is the wheel's
+# to make and this file does not pretend to have made it well.
+#
+# Keys match the constructor arguments of eclipse.rolling.WheeledPlatform, so
+# loading is WheeledPlatform(**parameters) with no mapping layer.
+
+schema_version = 1
+id             = "nominal-rover"
+
+[platform]
+name        = "Nominal rover"
+morphology  = "wheeled"
+basis       = "assumed"
+status      = "nominal_not_designed"
+
+[platform.parameters]
+# Split so that wheels are the same fraction of the total that legs are on the
+# quadruped, and the totals match at 50.0 kg.
+body_mass_kg  = 44.0
+wheel_mass_kg = 1.5
+wheels        = 4
+
+# Rigid wheel. No grousers, which is the first thing a real lunar wheel would
+# have and which raises traction substantially, so this understates the rover.
+wheel_diameter_m = 0.25
+wheel_width_m    = 0.10
+
+# Axle separation and lateral spacing. The wheelbase is what sets the tipping
+# limit when climbing, and it is matched to the quadruped deliberately.
+wheelbase_m   = 0.50
+track_width_m = 0.40
+
+center_of_mass_height_m = 0.30
+
+# The same operating condition the quadruped is given, so that a cost per metre
+# is compared at equal speed. Unlike the legged case this barely matters: with
+# no swing term there is nothing here that depends on speed at all, which is
+# itself one of the wheel's advantages.
+nominal_speed_m_per_s = 0.5
